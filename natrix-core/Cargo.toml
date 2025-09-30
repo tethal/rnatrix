@@ -1,0 +1,11 @@
+[package]
+name = "natrix-core"
+version = "0.1.0"
+edition = "2024"
+
+[dev-dependencies]
+test-utils = { path = "../test-utils" }
+
+[[test]]
+name = "golden_tests"
+harness = false
