@@ -54,6 +54,15 @@ reference cycles.
 - Natural learning progression
 - Will upgrade to proper tracing GC later (Phase 4+)
 
+**Future GC considerations:**
+
+When implementing tracing GC, pointer copies (e.g., `Gc::clone()`) will have no semantic side effects in a simple mark-sweep collector with conservative stack scanning. In theory, `Gc<T>` could be `Copy`. However, keeping it non-Copy (requiring explicit `.clone()`) maintains:
+- API consistency with Rust's smart pointer conventions
+- Flexibility for future GC improvements (generational GC, write barriers, incremental collection)
+- Option to add `Drop` for debugging/write barriers without breaking changes
+
+Alternative approaches like arena-based GC with lifetime-tagged references (`&'gc T`) could provide `Copy` semantics, worth exploring in Phase 4.
+
 ### Stack-Based Bytecode VM
 
 Phase 2 will use stack-based bytecode rather than register-based.
@@ -104,3 +113,34 @@ enum Expr {
 - Immutability simplifies reasoning about transformations
 - Matches production compiler patterns (rustc uses similar approach)
 - Easy to evolve - can add arena allocation or custom smart pointers later
+
+### Runtime Value Representation
+
+**Opaque `Value` type with accessor methods:**
+
+```rust
+pub struct Value(ValueImpl);  // ValueImpl is private
+
+impl Value {
+    pub fn from_int(n: i64) -> Self { ... }
+    pub fn from_float(n: f64) -> Self { ... }
+    pub fn as_int(&self) -> Option<i64> { ... }
+    pub fn as_float(&self) -> Option<f64> { ... }
+    // ...
+}
+```
+
+**Design decisions:**
+
+- **Opaque representation** - Internal representation is hidden to allow future optimization (NaN boxing, pointer tagging).
+- **Accessor methods only** - All value creation and inspection goes through methods, never direct enum matching.
+- **Distinct int/float types** - Following Python's approach rather than JavaScript (where everything is a float). Requires numeric coercion rules in the evaluator.
+- **Heap values return pointers** - Methods like `as_string()` return `Rc<String>` (or `Gc<String>` later), not borrowed references. This allows values to outlive the original `Value` instance.
+- **Start simple** - Initial implementation uses standard Rust enum with `Rc<>` for heap values. Can be replaced with NaN-boxed representation later without changing user code.
+
+**Rationale:**
+
+- Provides flexibility for future performance optimizations
+- Clean API boundary between value representation and evaluator logic
+- Returning owned pointers (not borrowed references) works better with Rust's ownership model when building data structures like environments
+- Integer/float distinction enables better native code generation later

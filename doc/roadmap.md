@@ -6,35 +6,29 @@ See [[README]] for project overview and design decisions.
 
 **Goal:** Build a working interpreter that directly evaluates AST nodes from script files
 
-### Infrastructure
+### Implementation Steps
 
 - [X] Project structure setup - libs with compiler/interpreter, CLI exe
 - [X] Framework for golden file based testing
-
-### Language Features
-
-- [ ] Basic expressions (arithmetic, comparison, logical)
-- [ ] Variables and assignment (`var x = 5`)
-- [ ] Functions (definition and calls)
-- [ ] Control flow (if/else, while loops)
-- [ ] Dynamic typing only
-- [ ] Run from script files
+- [X] **Value representation (primitives)** - Integers, floats, bools, nil. Opaque `Value` type with accessor methods.
+- [X] **Display for values** - Debug printing to test value representation.
+- [ ] **Tokenizer** - Literals (numbers, bools, nil), operators, parentheses for expressions.
+- [ ] **Parser (expressions only)** - Binary ops, unary ops, grouping. AST output.
+- [ ] **Evaluator (expressions)** - Tree-walking evaluation of expressions, returns `Value`.
+- [ ] **Strings** - Extend `Value`, add string literals and concatenation.
+- [ ] **Variables (let bindings)** - Add statements to parser, environment for name→value mapping.
+- [ ] **Lists** - List literals, indexing operations.
+- [ ] **Functions (first-class)** - Lambda syntax, closures, function calls.
+- [ ] **Builtin functions** - Print, length, etc.
+- [ ] **Control flow** - If/else, while loops.
 
 ### Rust Learning Focus
 
-- Enums for AST representation
-- Pattern matching for evaluation
-- `Rc<RefCell<>>` for environments/scopes
+- Enums for AST and internal value representation
+- Pattern matching for evaluation (via accessor methods)
+- `Rc<RefCell<>>` for environments/scopes and heap values
 - Basic error handling
 - Ownership and borrowing with tree structures
-
-### Deliverables
-
-- Lexer/Tokenizer
-- Parser (recursive descent)
-- AST definitions
-- Tree-walking evaluator
-- Test suite with example programs
 
 ### GC Strategy
 

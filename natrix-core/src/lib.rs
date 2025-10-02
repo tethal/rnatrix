@@ -1,3 +1,5 @@
+pub mod value;
+
 pub fn transform(s: &str) -> String {
     s.to_ascii_uppercase()
 }
