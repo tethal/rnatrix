@@ -56,12 +56,16 @@ reference cycles.
 
 **Future GC considerations:**
 
-When implementing tracing GC, pointer copies (e.g., `Gc::clone()`) will have no semantic side effects in a simple mark-sweep collector with conservative stack scanning. In theory, `Gc<T>` could be `Copy`. However, keeping it non-Copy (requiring explicit `.clone()`) maintains:
+When implementing tracing GC, pointer copies (e.g., `Gc::clone()`) will have no semantic side effects in a simple
+mark-sweep collector with conservative stack scanning. In theory, `Gc<T>` could be `Copy`. However, keeping it
+non-Copy (requiring explicit `.clone()`) maintains:
+
 - API consistency with Rust's smart pointer conventions
 - Flexibility for future GC improvements (generational GC, write barriers, incremental collection)
 - Option to add `Drop` for debugging/write barriers without breaking changes
 
-Alternative approaches like arena-based GC with lifetime-tagged references (`&'gc T`) could provide `Copy` semantics, worth exploring in Phase 4.
+Alternative approaches like arena-based GC with lifetime-tagged references (`&'gc T`) could provide `Copy` semantics,
+worth exploring in Phase 4.
 
 ### Stack-Based Bytecode VM
 
@@ -132,15 +136,86 @@ impl Value {
 
 **Design decisions:**
 
-- **Opaque representation** - Internal representation is hidden to allow future optimization (NaN boxing, pointer tagging).
+- **Opaque representation** - Internal representation is hidden to allow future optimization (NaN boxing, pointer
+  tagging).
 - **Accessor methods only** - All value creation and inspection goes through methods, never direct enum matching.
-- **Distinct int/float types** - Following Python's approach rather than JavaScript (where everything is a float). Requires numeric coercion rules in the evaluator.
-- **Heap values return pointers** - Methods like `as_string()` return `Rc<String>` (or `Gc<String>` later), not borrowed references. This allows values to outlive the original `Value` instance.
-- **Start simple** - Initial implementation uses standard Rust enum with `Rc<>` for heap values. Can be replaced with NaN-boxed representation later without changing user code.
+- **Distinct int/float types** - Following Python's approach rather than JavaScript (where everything is a float).
+  Requires numeric coercion rules in the evaluator.
+- **Heap values return pointers** - Methods like `as_string()` return `Rc<String>` (or `Gc<String>` later), not borrowed
+  references. This allows values to outlive the original `Value` instance.
+- **Start simple** - Initial implementation uses standard Rust enum with `Rc<>` for heap values. Can be replaced with
+  NaN-boxed representation later without changing user code.
 
 **Rationale:**
 
 - Provides flexibility for future performance optimizations
 - Clean API boundary between value representation and evaluator logic
-- Returning owned pointers (not borrowed references) works better with Rust's ownership model when building data structures like environments
+- Returning owned pointers (not borrowed references) works better with Rust's ownership model when building data
+  structures like environments
 - Integer/float distinction enables better native code generation later
+
+### Source Representation and Spans
+
+**Index-based design with append-only source collection:**
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SourceId(usize);
+
+struct Sources {
+    sources: Vec<Source>,  // Append-only collection
+}
+
+struct Span {
+    source_id: SourceId,  // No lifetime - just an ID
+    start: usize,
+    end: usize,
+}
+
+struct Cursor<'src> {
+    source: &'src Source,  // Temporary borrow during tokenization
+    offset: usize,
+}
+```
+
+**Design decisions:**
+
+- **Append-only Sources collection** - `Sources` owns all `Source` objects. Sources are never removed, so IDs remain
+  valid forever.
+- **Spans store IDs, not references** - `Span` contains `SourceId` rather than borrowing from Sources. This allows AST
+  to exist while adding new sources (e.g., from import statements).
+- **Cursors use lifetimes** - `Cursor` is temporary (used during tokenization), so it borrows `&Source` directly. This
+  provides ergonomic access without explicit ID lookups in hot tokenization loops.
+- **Explicit Sources passing** - Methods like `span.start_pos(&sources)` take explicit `&Sources` parameter. No
+  global/TLS access initially.
+- **Byte offset based spans** - Store start/end byte positions, convert to line:column on demand via binary search on
+  precomputed line starts.
+- **Eager line calculation** - Compute line start positions when loading source, keep `Source` immutable.
+
+**Rationale:**
+
+- **Handles dynamic source loading** - Can add sources after parsing has started (e.g., discovering imports), because
+  Span doesn't borrow from Sources.
+- **Compact and Copy** - `Span` is just 3 usizes (24 bytes). Can be `Copy`, works across threads without `Arc`.
+- **No refcounting overhead** - Unlike `Rc<Source>`, Spans are just integers. No atomic refcount operations.
+- **Production pattern** - Index-based source positions are used by rustc, clang, and other production compilers.
+- **Clear ownership** - Sources owns the data, Spans reference by ID. No shared ownership complexity.
+- **Append-only = IDs always valid** - Since sources are never removed, a `SourceId` is always valid for the lifetime of
+  the `Sources` collection.
+- **Future evolution** - Can add TLS access later for nicer Debug formatting. Can switch to `Gc<Source>` in Phase 4 if
+  shared ownership proves beneficial.
+
+## Future Improvements
+
+Ideas for later phases or optimizations:
+
+### Source Representation
+
+- **TLS access for Debug formatting** - Store `Sources` in thread-local storage to enable `Span` Debug impl to show
+  `file:line:col` instead of offsets
+- **Virtual source concatenation** - Treat all sources as one virtual string. A single global offset would determine
+  both source and position, eliminating need for separate `source_id` field in `Span`
+
+### Value Representation
+
+- **NaN boxing** - Pack `Value` into 64 bits using NaN-boxing technique for better cache locality

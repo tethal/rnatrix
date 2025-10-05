@@ -1,3 +1,4 @@
+pub mod src;
 pub mod value;
 
 pub fn transform(s: &str) -> String {

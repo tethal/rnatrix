@@ -12,6 +12,7 @@ See [[README]] for project overview and design decisions.
 - [X] Framework for golden file based testing
 - [X] **Value representation (primitives)** - Integers, floats, bools, nil. Opaque `Value` type with accessor methods.
 - [X] **Display for values** - Debug printing to test value representation.
+- [X] **Source representation** - SourceId-based design, Cursor for tokenization, Span for AST, location tracking
 - [ ] **Tokenizer** - Literals (numbers, bools, nil), operators, parentheses for expressions.
 - [ ] **Parser (expressions only)** - Binary ops, unary ops, grouping. AST output.
 - [ ] **Evaluator (expressions)** - Tree-walking evaluation of expressions, returns `Value`.
@@ -26,13 +27,16 @@ See [[README]] for project overview and design decisions.
 
 - Enums for AST and internal value representation
 - Pattern matching for evaluation (via accessor methods)
-- `Rc<RefCell<>>` for environments/scopes and heap values
+- **Index-based references** - Understanding when IDs work better than lifetimes/refcounting
+- **Strategic lifetime usage** - Using lifetimes for temporary structures (Cursor) but not persistent ones (Span)
+- `Rc<RefCell<>>` for environments/scopes and runtime heap values
 - Basic error handling
 - Ownership and borrowing with tree structures
 
-### GC Strategy
+### Memory Management Strategy
 
-Just `Rc<>`, accept memory leaks from cycles
+- **Sources/Spans:** Index-based design with append-only collection (see [[README#Source Representation and Spans]])
+- **Runtime values:** Just `Rc<>` for heap values, accept memory leaks from cycles
 
 ---
 
@@ -89,9 +93,10 @@ Upgrade to `Rc<RefCell<>>` with better reference management
 ### Rust Learning Focus
 
 - Complex AST traversal algorithms
-- Symbol tables with proper lifetimes
+- Symbol tables (index-based or with appropriate lifetimes)
 - Type representation and unification
 - Multi-pass compilation
+- Choosing the right ownership strategy for different data structures
 
 ### Deliverables
 
@@ -133,9 +138,10 @@ Keep it simple - no generics, no variance, no structural subtyping yet. Start wi
 - Proper GC (mark-sweep or mark-compact)
 - Benchmarks comparing interpreted vs compiled
 
-### GC Strategy
+### Memory Management Strategy
 
-Implement or integrate real tracing GC - required for native code
+- Implement or integrate real tracing GC - required for native code
+- **Optional:** Consider switching source references to GC'd pointers if beneficial, but index-based approach may remain appropriate
 
 ### Tools to Consider
 
