@@ -1,0 +1,4 @@
+Token { tt: LParen, span: @0:0-1 }: "("
+Token { tt: Error, span: @0:2-3 }: "@"
+Token { tt: RParen, span: @0:4-5 }: ")"
+Token { tt: Eof, span: @0:6-6 }: ""

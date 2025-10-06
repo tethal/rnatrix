@@ -1,0 +1,7 @@
+Token { tt: IntLiteral, span: @0:0-1 }: "1"
+Token { tt: Plus, span: @0:2-3 }: "+"
+Token { tt: IntLiteral, span: @0:4-5 }: "2"
+Token { tt: IntLiteral, span: @0:8-9 }: "3"
+Token { tt: Star, span: @0:11-12 }: "*"
+Token { tt: IntLiteral, span: @0:14-15 }: "4"
+Token { tt: Eof, span: @0:15-15 }: ""

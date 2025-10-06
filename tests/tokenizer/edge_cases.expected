@@ -1,0 +1,3 @@
+Token { tt: IntLiteral, span: @0:0-1 }: "0"
+Token { tt: IntLiteral, span: @0:2-5 }: "123"
+Token { tt: Eof, span: @0:5-5 }: ""

@@ -80,6 +80,7 @@ impl Source {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Span {
     source_id: SourceId,
     start: usize,
@@ -133,6 +134,10 @@ impl<'ctx> Cursor<'ctx> {
     pub fn span_from(&self, start: usize) -> Span {
         assert!(start <= self.offset);
         Span::new(self.source, start, self.offset)
+    }
+
+    pub fn lexeme(&self, span: &Span) -> &'ctx str {
+        &self.source.content()[span.start..span.end]
     }
 
     pub fn peek(&self) -> Option<char> {
