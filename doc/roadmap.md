@@ -13,7 +13,7 @@ See [[README]] for project overview and design decisions.
 - [X] **Value representation (primitives)** - Integers, floats, bools, nil. Opaque `Value` type with accessor methods.
 - [X] **Display for values** - Debug printing to test value representation.
 - [X] **Source representation** - SourceId-based design, Cursor for tokenization, Span for AST, location tracking
-- [ ] **Tokenizer** - Literals (numbers, bools, nil), operators, parentheses for expressions.
+- [X] **Tokenizer** - Literals, operators, parentheses for expressions.
 - [ ] **Parser (expressions only)** - Binary ops, unary ops, grouping. AST output.
 - [ ] **Evaluator (expressions)** - Tree-walking evaluation of expressions, returns `Value`.
 - [ ] **Strings** - Extend `Value`, add string literals and concatenation.
@@ -141,7 +141,8 @@ Keep it simple - no generics, no variance, no structural subtyping yet. Start wi
 ### Memory Management Strategy
 
 - Implement or integrate real tracing GC - required for native code
-- **Optional:** Consider switching source references to GC'd pointers if beneficial, but index-based approach may remain appropriate
+- **Optional:** Consider switching source references to GC'd pointers if beneficial, but index-based approach may remain
+  appropriate
 
 ### Tools to Consider
 
