@@ -1,7 +1,8 @@
 use std::fmt::Debug;
+use std::num::NonZeroUsize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceId(usize);
+pub struct SourceId(NonZeroUsize);
 
 #[derive(Default)]
 pub struct Sources {
@@ -14,14 +15,14 @@ impl Sources {
     }
 
     pub fn add_from_string(&mut self, content: &str) -> SourceId {
-        let id = SourceId(self.sources.len());
+        let id = SourceId(NonZeroUsize::new(self.sources.len() + 1).unwrap());
         let source = Source::new(id, "<string>".to_owned(), content.to_owned());
         self.sources.push(source);
         id
     }
 
     pub fn get_by_id(&self, id: SourceId) -> &Source {
-        &self.sources[id.0]
+        &self.sources[id.0.get() - 1]
     }
 }
 
@@ -105,11 +106,56 @@ impl Span {
     pub fn end_pos(&self, sources: &Sources) -> (usize, usize) {
         sources.get_by_id(self.source_id).offset_to_pos(self.end)
     }
+
+    pub fn extend_to(&self, end: Span) -> Span {
+        assert_eq!(self.source_id, end.source_id);
+        assert!(self.start <= end.end);
+        Span {
+            source_id: self.source_id,
+            start: self.start,
+            end: end.end,
+        }
+    }
+
+    pub fn debug_with<'a>(&'a self, sources: &'a Sources) -> SpanDebug<'a> {
+        SpanDebug::with_sources(&self, sources)
+    }
 }
 
 impl Debug for Span {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "@{}:{}-{}", self.source_id.0, self.start, self.end)
+        write!(
+            f,
+            "@{}:{}-{}",
+            self.source_id.0.get() - 1,
+            self.start,
+            self.end
+        )
+    }
+}
+
+pub struct SpanDebug<'a> {
+    span: &'a Span,
+    sources: &'a Sources,
+}
+
+impl<'a> SpanDebug<'a> {
+    fn with_sources(span: &'a Span, sources: &'a Sources) -> Self {
+        Self { span, sources }
+    }
+}
+
+impl<'a> Debug for SpanDebug<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (s_line, s_column) = self.span.start_pos(&self.sources);
+        let (e_line, e_column) = self.span.end_pos(&self.sources);
+        let name = self.sources.get_by_id(self.span.source_id).name();
+        write!(f, "@{}:", name)?;
+        if s_line == e_line {
+            write!(f, "{}:{}-{}", s_line, s_column, e_column)
+        } else {
+            write!(f, "{}-{}:{}-{}", s_line, s_column, e_line, e_column)
+        }
     }
 }
 
@@ -258,5 +304,11 @@ mod tests {
         assert_eq!(cursor.advance(), Some('\n'));
         assert_eq!(cursor.advance(), Some('🦀'));
         assert_eq!(cursor.advance(), None);
+    }
+
+    #[test]
+    fn test_span_size_optimization() {
+        assert_eq!(size_of::<Span>(), 24);
+        assert_eq!(size_of::<Option<Span>>(), 24);
     }
 }

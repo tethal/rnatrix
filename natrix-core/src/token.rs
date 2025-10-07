@@ -23,40 +23,26 @@ pub struct Token {
 
 pub struct Tokenizer<'src> {
     cursor: Cursor<'src>,
-    next_token: Token,
 }
 
 impl<'src> Tokenizer<'src> {
     pub fn new(source: &'src Source) -> Tokenizer<'src> {
-        let cursor = Cursor::new(source);
-        let next_token = Token {
-            tt: TokenType::Error,
-            span: cursor.span_from(0),
-        };
-        let mut tokenizer = Tokenizer { cursor, next_token };
-        tokenizer.advance();
-        tokenizer
+        Tokenizer {
+            cursor: Cursor::new(source),
+        }
     }
 
-    pub fn peek(&self) -> Token {
-        self.next_token
-    }
-
-    pub fn advance(&mut self) -> Token {
-        let next_token = self.next_token;
+    pub fn next_token(&mut self) -> Token {
         loop {
             let start = self.cursor.offset();
-            self.next_token = Token {
+            let token = Token {
                 tt: self.parse_token_type(),
                 span: self.cursor.span_from(start),
             };
-            if self.next_token.tt != TokenType::Comment
-                && self.next_token.tt != TokenType::Whitespace
-            {
-                break;
+            if token.tt != TokenType::Comment && token.tt != TokenType::Whitespace {
+                return token;
             }
         }
-        next_token
     }
 
     pub fn lexeme(&self, token: &Token) -> &str {
