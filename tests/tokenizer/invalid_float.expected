@@ -1,0 +1,4 @@
+Token { tt: Error, span: @0:0-2 }: "3."
+Token { tt: Minus, span: @0:3-4 }: "-"
+Token { tt: IntLiteral, span: @0:5-6 }: "1"
+Token { tt: Eof, span: @0:7-7 }: ""

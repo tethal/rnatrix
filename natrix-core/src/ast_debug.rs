@@ -93,6 +93,9 @@ impl Debug for AstDebug<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match &self.expr.kind {
             ExprKind::IntLiteral(value) => self.fmt_header_with_value(f, "IntLiteral", value),
+            ExprKind::FloatLiteral(value) => self.fmt_header_with_value(f, "FloatLiteral", value),
+            ExprKind::BoolLiteral(value) => self.fmt_header_with_value(f, "BoolLiteral", value),
+            ExprKind::NullLiteral => self.fmt_header(f, "NullLiteral"),
             ExprKind::Paren(inner) => {
                 self.fmt_header(f, "Paren")?;
                 self.fmt_child(f, inner)

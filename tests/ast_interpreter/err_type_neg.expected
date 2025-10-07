@@ -1,0 +1,1 @@
+Error { message: "unary negation cannot be applied to Bool", span: Some(@0:0-1) }

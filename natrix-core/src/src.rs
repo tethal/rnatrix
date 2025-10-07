@@ -182,7 +182,7 @@ impl<'ctx> Cursor<'ctx> {
         Span::new(self.source, start, self.offset)
     }
 
-    pub fn lexeme(&self, span: &Span) -> &'ctx str {
+    pub fn lexeme(&self, span: Span) -> &'ctx str {
         &self.source.content()[span.start..span.end]
     }
 

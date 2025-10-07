@@ -1,3 +1,4 @@
+use natrix_core::ast_interpreter::eval;
 use natrix_core::parser::parse;
 use natrix_core::src::Sources;
 use natrix_core::token::{TokenType, Tokenizer};
@@ -34,9 +35,25 @@ fn test_parser(path: &Path) -> test_utils::TestResult {
     })
 }
 
+fn test_ast_interpreter(path: &Path) -> test_utils::TestResult {
+    run_golden_test(path, |input| {
+        let mut sources = Sources::default();
+        let source_id = sources.add_from_string(input);
+        let source = sources.get_by_id(source_id);
+        match &parse(source) {
+            Ok(expr) => match eval(expr) {
+                Ok(value) => format!("{:?}", value),
+                Err(error) => format!("{:?}", error),
+            },
+            Err(error) => format!("{:?}", error),
+        }
+    })
+}
+
 const INPUT_PATTERN: &str = r".*\.nx$";
 
 datatest_stable::harness! {
     { test = test_tokenizer, root = "../tests/tokenizer", pattern = INPUT_PATTERN },
     { test = test_parser, root = "../tests/parser", pattern = INPUT_PATTERN },
+    { test = test_ast_interpreter, root = "../tests/ast_interpreter", pattern = INPUT_PATTERN },
 }

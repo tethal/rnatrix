@@ -1,0 +1,1 @@
+Error { message: "division by zero", span: Some(@0:2-3) }

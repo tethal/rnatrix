@@ -119,6 +119,17 @@ impl<'src> Parser<'src> {
                 self.consume();
                 Ok(Expr::boxed(ExprKind::IntLiteral(value), span))
             }
+            TokenType::FloatLiteral => {
+                let span = self.span();
+                let value = f64::from_str(self.lexeme()).map_err(|e| self.error(e.to_string()))?;
+                self.consume();
+                Ok(Expr::boxed(ExprKind::FloatLiteral(value), span))
+            }
+            TokenType::KwTrue | TokenType::KwFalse => Ok(Expr::boxed(
+                ExprKind::BoolLiteral(self.tt() == TokenType::KwTrue),
+                self.consume().span,
+            )),
+            TokenType::KwNull => Ok(Expr::boxed(ExprKind::NullLiteral, self.consume().span)),
             TokenType::LParen => {
                 let span = self.consume().span;
                 let e = self.expr()?;

@@ -18,6 +18,9 @@ pub enum UnaryOp {
 
 pub enum ExprKind {
     IntLiteral(i64),
+    FloatLiteral(f64),
+    BoolLiteral(bool),
+    NullLiteral,
     Paren(Box<Expr>),
     Unary {
         op: UnaryOp,

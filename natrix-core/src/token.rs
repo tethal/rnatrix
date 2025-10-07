@@ -6,7 +6,12 @@ pub enum TokenType {
     Error,
     Whitespace,
     Comment,
+    KwTrue,
+    KwFalse,
+    KwNull,
+    Identifier,
     IntLiteral,
+    FloatLiteral,
     LParen,
     RParen,
     Plus,
@@ -35,10 +40,18 @@ impl<'src> Tokenizer<'src> {
     pub fn next_token(&mut self) -> Token {
         loop {
             let start = self.cursor.offset();
-            let token = Token {
-                tt: self.parse_token_type(),
-                span: self.cursor.span_from(start),
-            };
+            let mut tt = self.parse_token_type();
+            let span = self.cursor.span_from(start);
+            if tt == TokenType::Identifier {
+                let lexeme = self.cursor.lexeme(span);
+                tt = match lexeme {
+                    "true" => TokenType::KwTrue,
+                    "false" => TokenType::KwFalse,
+                    "null" => TokenType::KwNull,
+                    _ => TokenType::Identifier,
+                }
+            }
+            let token = Token { tt, span };
             if token.tt != TokenType::Comment && token.tt != TokenType::Whitespace {
                 return token;
             }
@@ -46,13 +59,14 @@ impl<'src> Tokenizer<'src> {
     }
 
     pub fn lexeme(&self, token: &Token) -> &str {
-        self.cursor.lexeme(&token.span)
+        self.cursor.lexeme(token.span)
     }
 
     fn parse_token_type(&mut self) -> TokenType {
         match self.cursor.advance() {
             Some(c) if c.is_whitespace() => self.do_whitespace(),
-            Some(c) if c.is_digit(10) => self.do_int_literal(),
+            Some(c) if c.is_ascii_digit() => self.do_number(),
+            Some(c) if c.is_ascii_alphabetic() || c == '_' => self.do_identifier(),
             Some('(') => TokenType::LParen,
             Some(')') => TokenType::RParen,
             Some('+') => TokenType::Plus,
@@ -65,20 +79,38 @@ impl<'src> Tokenizer<'src> {
     }
 
     fn do_whitespace(&mut self) -> TokenType {
-        while let Some(c) = self.cursor.peek()
-            && c.is_whitespace()
-        {
+        while self.cursor.peek().is_some_and(|c| c.is_whitespace()) {
             self.cursor.advance();
         }
         TokenType::Whitespace
     }
 
-    fn do_int_literal(&mut self) -> TokenType {
-        while let Some(c) = self.cursor.peek()
-            && c.is_digit(10)
+    fn do_number(&mut self) -> TokenType {
+        while self.cursor.peek().is_some_and(|c| c.is_ascii_digit()) {
+            self.cursor.advance();
+        }
+        if self.cursor.peek() == Some('.') {
+            self.cursor.advance();
+            if !self.cursor.peek().is_some_and(|c| c.is_ascii_digit()) {
+                return TokenType::Error;
+            }
+            while self.cursor.peek().is_some_and(|c| c.is_ascii_digit()) {
+                self.cursor.advance();
+            }
+            TokenType::FloatLiteral
+        } else {
+            TokenType::IntLiteral
+        }
+    }
+
+    fn do_identifier(&mut self) -> TokenType {
+        while self
+            .cursor
+            .peek()
+            .is_some_and(|c| c.is_ascii_alphanumeric() || c == '_')
         {
             self.cursor.advance();
         }
-        TokenType::IntLiteral
+        TokenType::Identifier
     }
 }

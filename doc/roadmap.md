@@ -15,7 +15,8 @@ See [[README]] for project overview and design decisions.
 - [X] **Source representation** - SourceId-based design, Cursor for tokenization, Span for AST, location tracking
 - [X] **Tokenizer** - Literals, operators, parentheses for expressions.
 - [X] **Parser (expressions only)** - Binary ops, unary ops, grouping. AST output.
-- [ ] **Evaluator (expressions)** - Tree-walking evaluation of expressions, returns `Value`.
+- [X] **Evaluator (expressions)** - Tree-walking evaluation of expressions, returns `Value`.
+- [ ] **Error reporting** - review all test cases and improve the error messages.
 - [ ] **Strings** - Extend `Value`, add string literals and concatenation.
 - [ ] **Variables (let bindings)** - Add statements to parser, environment for name→value mapping.
 - [ ] **Lists** - List literals, indexing operations.
