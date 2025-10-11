@@ -6,23 +6,18 @@
 //! Parser code may safely `.unwrap()` spans on parsed expressions - a `None` indicates a parser bug.
 
 use crate::ast::{BinaryOp, Expr, ExprKind, UnaryOp};
+use crate::error::{NxError, NxResult};
 use crate::src::{Source, Span};
 use crate::token::{Token, TokenType, Tokenizer};
 use std::str::FromStr;
 
-#[derive(Debug)]
-pub struct Error {
-    pub message: String,
-    pub span: Option<Span>,
-}
-
-pub type ParseResult = Result<Box<Expr>, Error>;
+pub type ParseResult = NxResult<Box<Expr>>;
 
 pub fn parse(source: &Source) -> ParseResult {
-    let mut parser = Parser::new(source);
+    let mut parser = Parser::new(source)?;
     let result = parser.expr()?;
     if parser.tt() != TokenType::Eof {
-        parser.err(format!("Unexpected token: {:?}", parser.tt()))
+        parser.err(format!("unexpected token: {:?}", parser.tt()))
     } else {
         Ok(result)
     }
@@ -34,13 +29,13 @@ struct Parser<'src> {
 }
 
 impl<'src> Parser<'src> {
-    fn new(source: &'src Source) -> Self {
+    fn new(source: &'src Source) -> NxResult<Self> {
         let mut tokenizer = Tokenizer::new(source);
-        let current_token = tokenizer.next_token();
-        Parser {
+        let current_token = tokenizer.next_token()?;
+        Ok(Parser {
             tokenizer,
             current_token,
-        }
+        })
     }
 
     fn expr(&mut self) -> ParseResult {
@@ -55,7 +50,7 @@ impl<'src> Parser<'src> {
                 TokenType::Minus => BinaryOp::Sub,
                 _ => return Ok(left),
             };
-            let op_span = self.consume().span;
+            let op_span = self.consume()?.span;
             let right = self.multiplicative()?;
             let span = left.span.unwrap().extend_to(right.span.unwrap());
             left = Expr::boxed(
@@ -78,7 +73,7 @@ impl<'src> Parser<'src> {
                 TokenType::Slash => BinaryOp::Div,
                 _ => return Ok(left),
             };
-            let op_span = self.consume().span;
+            let op_span = self.consume()?.span;
             let right = self.unary()?;
             let span = left.span.unwrap().extend_to(right.span.unwrap());
             left = Expr::boxed(
@@ -95,7 +90,7 @@ impl<'src> Parser<'src> {
 
     fn unary(&mut self) -> ParseResult {
         if self.tt() == TokenType::Minus {
-            let op_span = self.consume().span;
+            let op_span = self.consume()?.span;
             let expr = self.primary()?;
             let span = op_span.extend_to(expr.span.unwrap());
             Ok(Expr::boxed(
@@ -116,42 +111,42 @@ impl<'src> Parser<'src> {
             TokenType::IntLiteral => {
                 let span = self.span();
                 let value = i64::from_str(self.lexeme()).map_err(|e| self.error(e.to_string()))?;
-                self.consume();
+                self.consume()?;
                 Ok(Expr::boxed(ExprKind::IntLiteral(value), span))
             }
             TokenType::FloatLiteral => {
                 let span = self.span();
                 let value = f64::from_str(self.lexeme()).map_err(|e| self.error(e.to_string()))?;
-                self.consume();
+                self.consume()?;
                 Ok(Expr::boxed(ExprKind::FloatLiteral(value), span))
             }
             TokenType::KwTrue | TokenType::KwFalse => Ok(Expr::boxed(
                 ExprKind::BoolLiteral(self.tt() == TokenType::KwTrue),
-                self.consume().span,
+                self.consume()?.span,
             )),
-            TokenType::KwNull => Ok(Expr::boxed(ExprKind::NullLiteral, self.consume().span)),
+            TokenType::KwNull => Ok(Expr::boxed(ExprKind::NullLiteral, self.consume()?.span)),
             TokenType::LParen => {
-                let span = self.consume().span;
+                let span = self.consume()?.span;
                 let e = self.expr()?;
                 let span = span.extend_to(self.expect(TokenType::RParen)?.span);
                 Ok(Expr::boxed(ExprKind::Paren(e), span))
             }
-            tt => self.err(format!("Expected expression, not {:?}", tt)),
+            tt => self.err(format!("expected expression, not {:?}", tt)),
         }
     }
 
-    fn expect(&mut self, tt: TokenType) -> Result<Token, Error> {
+    fn expect(&mut self, tt: TokenType) -> NxResult<Token> {
         if self.tt() == tt {
-            Ok(self.consume())
+            self.consume()
         } else {
-            self.err(format!("Expected {:?}, not {:?}", tt, self.tt()))
+            self.err(format!("expected {:?}, not {:?}", tt, self.tt()))
         }
     }
 
-    fn consume(&mut self) -> Token {
+    fn consume(&mut self) -> NxResult<Token> {
         let token = self.current_token;
-        self.current_token = self.tokenizer.next_token();
-        token
+        self.current_token = self.tokenizer.next_token()?;
+        Ok(token)
     }
 
     fn tt(&self) -> TokenType {
@@ -166,12 +161,12 @@ impl<'src> Parser<'src> {
         self.tokenizer.lexeme(&self.current_token)
     }
 
-    fn err<T>(&self, message: impl Into<String>) -> Result<T, Error> {
+    fn err<T>(&self, message: impl Into<String>) -> NxResult<T> {
         Err(self.error(message))
     }
 
-    fn error(&self, message: impl Into<String>) -> Error {
-        Error {
+    fn error(&self, message: impl Into<String>) -> NxError {
+        NxError {
             message: message.into(),
             span: Some(self.current_token.span),
         }

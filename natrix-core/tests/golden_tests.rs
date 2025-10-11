@@ -2,6 +2,7 @@ use natrix_core::ast_interpreter::eval;
 use natrix_core::parser::parse;
 use natrix_core::src::Sources;
 use natrix_core::token::{TokenType, Tokenizer};
+use std::fmt::Write;
 use std::path::Path;
 use test_utils::{datatest_stable, run_golden_test};
 
@@ -13,8 +14,14 @@ fn test_tokenizer(path: &Path) -> test_utils::TestResult {
         let mut tokenizer = Tokenizer::new(source);
         let mut result = String::new();
         loop {
-            let token = tokenizer.next_token();
-            result.push_str(format!("{:?}: {:?}\n", token, tokenizer.lexeme(&token)).as_str());
+            let token = match tokenizer.next_token() {
+                Ok(token) => token,
+                Err(error) => {
+                    writeln!(result, "{}", error.display_with(&sources)).unwrap();
+                    break;
+                }
+            };
+            writeln!(result, "{:?}: {:?}", token, tokenizer.lexeme(&token)).unwrap();
             if token.tt == TokenType::Eof {
                 break;
             }
@@ -30,7 +37,7 @@ fn test_parser(path: &Path) -> test_utils::TestResult {
         let source = sources.get_by_id(source_id);
         match parse(source) {
             Ok(ast) => format!("{:?}", ast.debug_with(&sources)),
-            Err(error) => format!("{:?}", error),
+            Err(error) => format!("{}", error.display_with(&sources)),
         }
     })
 }
@@ -40,12 +47,10 @@ fn test_ast_interpreter(path: &Path) -> test_utils::TestResult {
         let mut sources = Sources::default();
         let source_id = sources.add_from_string(input);
         let source = sources.get_by_id(source_id);
-        match &parse(source) {
-            Ok(expr) => match eval(expr) {
-                Ok(value) => format!("{:?}", value),
-                Err(error) => format!("{:?}", error),
-            },
-            Err(error) => format!("{:?}", error),
+        let result = parse(source).and_then(|e| eval(&e));
+        match &result {
+            Ok(value) => format!("{:?}", value),
+            Err(error) => format!("{}", error.display_with(&sources)),
         }
     })
 }

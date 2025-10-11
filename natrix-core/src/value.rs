@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueType {
     Null,
@@ -77,6 +79,17 @@ impl Value {
         match self.0 {
             ValueImpl::Float(v) => Some(v),
             _ => None,
+        }
+    }
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            ValueImpl::Null => write!(f, "null"),
+            ValueImpl::Bool(v) => write!(f, "{}", v),
+            ValueImpl::Int(v) => write!(f, "{}", v),
+            ValueImpl::Float(v) => write!(f, "{}", v),
         }
     }
 }

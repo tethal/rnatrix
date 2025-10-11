@@ -1,6 +1,7 @@
 pub mod ast;
 mod ast_debug;
 pub mod ast_interpreter;
+pub mod error;
 pub mod parser;
 pub mod src;
 pub mod token;

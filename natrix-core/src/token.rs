@@ -1,9 +1,9 @@
+use crate::error::{err_at, NxResult};
 use crate::src::{Cursor, Source, Span};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TokenType {
     Eof,
-    Error,
     Whitespace,
     Comment,
     KwTrue,
@@ -37,11 +37,11 @@ impl<'src> Tokenizer<'src> {
         }
     }
 
-    pub fn next_token(&mut self) -> Token {
+    pub fn next_token(&mut self) -> NxResult<Token> {
         loop {
-            let start = self.cursor.offset();
-            let mut tt = self.parse_token_type();
-            let span = self.cursor.span_from(start);
+            self.cursor.mark();
+            let mut tt = self.parse_token_type()?;
+            let span = self.cursor.span_from_mark();
             if tt == TokenType::Identifier {
                 let lexeme = self.cursor.lexeme(span);
                 tt = match lexeme {
@@ -53,7 +53,7 @@ impl<'src> Tokenizer<'src> {
             }
             let token = Token { tt, span };
             if token.tt != TokenType::Comment && token.tt != TokenType::Whitespace {
-                return token;
+                return Ok(token);
             }
         }
     }
@@ -62,48 +62,54 @@ impl<'src> Tokenizer<'src> {
         self.cursor.lexeme(token.span)
     }
 
-    fn parse_token_type(&mut self) -> TokenType {
+    fn parse_token_type(&mut self) -> NxResult<TokenType> {
         match self.cursor.advance() {
             Some(c) if c.is_whitespace() => self.do_whitespace(),
             Some(c) if c.is_ascii_digit() => self.do_number(),
             Some(c) if c.is_ascii_alphabetic() || c == '_' => self.do_identifier(),
-            Some('(') => TokenType::LParen,
-            Some(')') => TokenType::RParen,
-            Some('+') => TokenType::Plus,
-            Some('-') => TokenType::Minus,
-            Some('*') => TokenType::Star,
-            Some('/') => TokenType::Slash,
-            Some(_) => TokenType::Error,
-            None => TokenType::Eof,
+            Some('(') => Ok(TokenType::LParen),
+            Some(')') => Ok(TokenType::RParen),
+            Some('+') => Ok(TokenType::Plus),
+            Some('-') => Ok(TokenType::Minus),
+            Some('*') => Ok(TokenType::Star),
+            Some('/') => Ok(TokenType::Slash),
+            Some(c) => err_at(
+                self.cursor.span_from_mark(),
+                format!("unexpected character {:?}", c),
+            ),
+            None => Ok(TokenType::Eof),
         }
     }
 
-    fn do_whitespace(&mut self) -> TokenType {
+    fn do_whitespace(&mut self) -> NxResult<TokenType> {
         while self.cursor.peek().is_some_and(|c| c.is_whitespace()) {
             self.cursor.advance();
         }
-        TokenType::Whitespace
+        Ok(TokenType::Whitespace)
     }
 
-    fn do_number(&mut self) -> TokenType {
+    fn do_number(&mut self) -> NxResult<TokenType> {
         while self.cursor.peek().is_some_and(|c| c.is_ascii_digit()) {
             self.cursor.advance();
         }
         if self.cursor.peek() == Some('.') {
             self.cursor.advance();
             if !self.cursor.peek().is_some_and(|c| c.is_ascii_digit()) {
-                return TokenType::Error;
+                return err_at(
+                    self.cursor.span_from_mark(),
+                    "expected digit after decimal point",
+                );
             }
             while self.cursor.peek().is_some_and(|c| c.is_ascii_digit()) {
                 self.cursor.advance();
             }
-            TokenType::FloatLiteral
+            Ok(TokenType::FloatLiteral)
         } else {
-            TokenType::IntLiteral
+            Ok(TokenType::IntLiteral)
         }
     }
 
-    fn do_identifier(&mut self) -> TokenType {
+    fn do_identifier(&mut self) -> NxResult<TokenType> {
         while self
             .cursor
             .peek()
@@ -111,6 +117,6 @@ impl<'src> Tokenizer<'src> {
         {
             self.cursor.advance();
         }
-        TokenType::Identifier
+        Ok(TokenType::Identifier)
     }
 }

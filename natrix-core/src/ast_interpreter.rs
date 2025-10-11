@@ -1,14 +1,9 @@
 use crate::ast::{BinaryOp, Expr, ExprKind, UnaryOp};
+use crate::error::{err_at, NxResult};
 use crate::src::Span;
 use crate::value::{Value, ValueType};
 
-#[derive(Debug)]
-pub struct Error {
-    pub message: String,
-    pub span: Option<Span>,
-}
-
-pub type EvalResult = Result<Value, Error>;
+pub type EvalResult = NxResult<Value>;
 
 pub fn eval(expr: &Expr) -> EvalResult {
     match &expr.kind {
@@ -101,15 +96,4 @@ fn eval_float_binary(op: BinaryOp, left: f64, right: f64) -> EvalResult {
         BinaryOp::Div => left / right,
     };
     Ok(Value::from_float(result))
-}
-
-fn err_at(span: Span, message: impl Into<String>) -> EvalResult {
-    Err(error_at(span, message))
-}
-
-fn error_at(span: Span, message: impl Into<String>) -> Error {
-    Error {
-        message: message.into(),
-        span: Some(span),
-    }
 }

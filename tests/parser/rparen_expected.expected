@@ -1,1 +1,3 @@
-Error { message: "Expected RParen, not IntLiteral", span: Some(@0:10-12) }
+<string>:1:11: error: expected RParen, not IntLiteral
+( 43 + 42 11 )
+          ^^

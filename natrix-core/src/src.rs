@@ -43,6 +43,7 @@ impl Source {
                 line_starts.push(i + 1);
             }
         }
+        line_starts.push(bytes.len() + 1);
         Source {
             id,
             name,
@@ -57,6 +58,10 @@ impl Source {
 
     pub fn content(&self) -> &str {
         &self.content
+    }
+
+    pub fn get_line(&self, line_no: usize) -> &str {
+        &self.content[self.line_starts[line_no - 1]..self.line_starts[line_no] - 1]
     }
 
     fn offset_to_pos(&self, offset: usize) -> (usize, usize) {
@@ -97,6 +102,10 @@ impl Span {
             start,
             end,
         }
+    }
+
+    pub fn source_id(&self) -> SourceId {
+        self.source_id
     }
 
     pub fn start_pos(&self, sources: &Sources) -> (usize, usize) {
@@ -162,11 +171,20 @@ impl<'a> Debug for SpanDebug<'a> {
 pub struct Cursor<'ctx> {
     source: &'ctx Source,
     offset: usize,
+    mark: usize,
 }
 
 impl<'ctx> Cursor<'ctx> {
     pub fn new(source: &'ctx Source) -> Self {
-        Cursor { source, offset: 0 }
+        Cursor {
+            source,
+            offset: 0,
+            mark: 0,
+        }
+    }
+
+    pub fn mark(&mut self) {
+        self.mark = self.offset
     }
 
     pub fn offset(&self) -> usize {
@@ -180,6 +198,10 @@ impl<'ctx> Cursor<'ctx> {
     pub fn span_from(&self, start: usize) -> Span {
         assert!(start <= self.offset);
         Span::new(self.source, start, self.offset)
+    }
+
+    pub fn span_from_mark(&self) -> Span {
+        self.span_from(self.mark)
     }
 
     pub fn lexeme(&self, span: Span) -> &'ctx str {
@@ -310,5 +332,41 @@ mod tests {
     fn test_span_size_optimization() {
         assert_eq!(size_of::<Span>(), 24);
         assert_eq!(size_of::<Option<Span>>(), 24);
+    }
+
+    #[test]
+    fn test_get_line_no_trailing_nl() {
+        let mut sources = Sources::new();
+        let sid = sources.add_from_string("a\nbc\ndef");
+        let s = sources.get_by_id(sid);
+        assert_eq!(s.get_line(1), "a");
+        assert_eq!(s.get_line(2), "bc");
+        assert_eq!(s.get_line(3), "def");
+    }
+
+    #[test]
+    fn test_get_line_trailing_nl() {
+        let mut sources = Sources::new();
+        let sid = sources.add_from_string("ab\ncd\n");
+        let s = sources.get_by_id(sid);
+        assert_eq!(s.get_line(1), "ab");
+        assert_eq!(s.get_line(2), "cd");
+        assert_eq!(s.get_line(3), "");
+    }
+
+    #[test]
+    fn test_get_line_single_line() {
+        let mut sources = Sources::new();
+        let sid = sources.add_from_string("hello");
+        let s = sources.get_by_id(sid);
+        assert_eq!(s.get_line(1), "hello");
+    }
+
+    #[test]
+    fn test_get_line_empty() {
+        let mut sources = Sources::new();
+        let sid = sources.add_from_string("");
+        let s = sources.get_by_id(sid);
+        assert_eq!(s.get_line(1), "");
     }
 }
