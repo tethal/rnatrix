@@ -106,8 +106,8 @@ enum Expr {
   Rust's move semantics make this efficient by reusing unchanged subtrees.
 - **Separate representations per phase** - Following rustc's approach: immutable AST → typed IR (later phases). Type
   information lives in separate structures, not mixed into AST.
-- **Consistent indirection** - Always use `Box<Expr>` for expression children, even when not strictly required for
-  recursion. Provides uniform representation and easier refactoring.
+- **Minimal boxing** - Use `Box<Expr>` only where required for recursive types (e.g., `Binary`, `Unary`). Non-recursive
+  containers (like statement variants) store expressions directly for better performance and cache locality.
 - **Direct `Box`, no abstraction** - Use `Box<Expr>` directly rather than `type ExprPtr = Box<Expr>` or custom wrappers.
   Keep it simple; can refactor to arena allocation later if needed.
 

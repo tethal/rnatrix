@@ -1,0 +1,3 @@
+<string>:1:1: error: expected lvalue on the left side of assignment
+4 + 5 = 8;
+^^^^^

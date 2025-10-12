@@ -1,16 +1,18 @@
-Binary @<string>:1-1:2-9
-  op: Sub @<string>:2:2-3
-  Binary @<string>:1:1-17
-    op: Mul @<string>:1:9-10
-    Paren @<string>:1:1-8
-      Binary @<string>:1:2-7
-        op: Add @<string>:1:4-5
-        IntLiteral(1) @<string>:1:2-3
-        IntLiteral(2) @<string>:1:6-7
-    Unary @<string>:1:11-17
-      op: Neg @<string>:1:11-12
-      FloatLiteral(3.14) @<string>:1:13-17
-  Binary @<string>:2:4-9
-    op: Div @<string>:2:6-7
-    IntLiteral(4) @<string>:2:4-5
-    IntLiteral(5) @<string>:2:8-9
+Block @<string>:1-1:3-1
+  Expr @<string>:1-1:2-9
+    Binary @<string>:1-1:2-9
+      op: Sub @<string>:2:2-3
+      Binary @<string>:1:1-17
+        op: Mul @<string>:1:9-10
+        Paren @<string>:1:1-8
+          Binary @<string>:1:2-7
+            op: Add @<string>:1:4-5
+            IntLiteral(1) @<string>:1:2-3
+            IntLiteral(2) @<string>:1:6-7
+        Unary @<string>:1:11-17
+          op: Neg @<string>:1:11-12
+          FloatLiteral(3.14) @<string>:1:13-17
+      Binary @<string>:2:4-9
+        op: Div @<string>:2:6-7
+        IntLiteral(4) @<string>:2:4-5
+        IntLiteral(5) @<string>:2:8-9

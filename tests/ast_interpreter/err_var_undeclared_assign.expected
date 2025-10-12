@@ -1,0 +1,3 @@
+<string>:2:1: error: undeclared variable "y"
+y = 20;
+^

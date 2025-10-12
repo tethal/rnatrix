@@ -6,6 +6,7 @@ pub enum TokenType {
     KwTrue,
     KwFalse,
     KwNull,
+    KwVar,
     Identifier,
     IntLiteral,
     FloatLiteral,
@@ -15,10 +16,13 @@ pub enum TokenType {
     Minus,
     Star,
     Slash,
+    Semicolon,
+    Assign,
 }
 
 pub const KEYWORDS: &[(&str, TokenType)] = &[
     ("true", TokenType::KwTrue),
     ("false", TokenType::KwFalse),
     ("null", TokenType::KwNull),
+    ("var", TokenType::KwVar),
 ];

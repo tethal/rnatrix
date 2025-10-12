@@ -66,6 +66,8 @@ impl<'ctx> Tokenizer<'ctx> {
             Some('-') => Ok(TokenType::Minus),
             Some('*') => Ok(TokenType::Star),
             Some('/') => Ok(TokenType::Slash),
+            Some('=') => Ok(TokenType::Assign),
+            Some(';') => Ok(TokenType::Semicolon),
             Some(c) => err_at(
                 self.cursor.span_from_mark(),
                 format!("unexpected character {:?}", c),

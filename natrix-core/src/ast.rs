@@ -1,8 +1,43 @@
 use crate::src::Span;
 use std::fmt::{self, Debug, Formatter};
 
-pub use crate::ast_debug::AstDebug;
+use crate::ast_debug::{ExprDebug, StmtDebug};
 use crate::ctx::{CompilerContext, Name};
+
+pub struct Stmt {
+    pub kind: StmtKind,
+    pub span: Span,
+}
+
+pub enum StmtKind {
+    Assign {
+        left: Expr,
+        right: Expr,
+    },
+    Block(Vec<Stmt>),
+    Expr(Expr),
+    VarDecl {
+        name: Name,
+        name_span: Span,
+        init: Expr,
+    },
+}
+
+impl Stmt {
+    pub fn new(kind: StmtKind, span: Span) -> Self {
+        Self { kind, span }
+    }
+
+    pub fn debug_with<'a>(&'a self, ctx: &'a CompilerContext) -> StmtDebug<'a> {
+        StmtDebug::with_context(self, ctx)
+    }
+}
+
+impl Debug for Stmt {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        StmtDebug::new(self).fmt(f)
+    }
+}
 
 #[derive(Debug, Copy, Clone)]
 pub enum BinaryOp {
@@ -37,37 +72,27 @@ pub enum ExprKind {
     Var(Name),
 }
 
-/// An expression node in the AST.
-///
-/// # Span Invariant
-///
-/// The `span` field is `Some` for all AST nodes created by the parser, allowing
-/// accurate error reporting and source location tracking. The `Option` wrapper
-/// exists to support future AST transformations and synthetic nodes that have no
-/// source location (e.g., compiler-generated code, optimizations, desugaring).
-///
-/// **Parser code may safely `.unwrap()` the span** - a `None` value indicates
-/// a bug in the parser itself.
 pub struct Expr {
     pub kind: ExprKind,
-    pub span: Option<Span>,
+    pub span: Span,
 }
 
 impl Expr {
-    pub fn boxed(kind: ExprKind, span: Span) -> Box<Self> {
-        Box::new(Self {
-            kind,
-            span: Some(span),
-        })
+    pub fn new(kind: ExprKind, span: Span) -> Self {
+        Self { kind, span }
     }
 
-    pub fn debug_with<'a>(&'a self, ctx: &'a CompilerContext) -> AstDebug<'a> {
-        AstDebug::with_context(self, ctx)
+    pub fn debug_with<'a>(&'a self, ctx: &'a CompilerContext) -> ExprDebug<'a> {
+        ExprDebug::with_context(self, ctx)
+    }
+
+    pub fn is_lvalue(&self) -> bool {
+        matches!(self.kind, ExprKind::Var(_))
     }
 }
 
 impl Debug for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        AstDebug::new(self).fmt(f)
+        ExprDebug::new(self).fmt(f)
     }
 }

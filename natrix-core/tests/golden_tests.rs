@@ -1,4 +1,4 @@
-use natrix_core::ast_interpreter::eval;
+use natrix_core::ast_interpreter::run;
 use natrix_core::ctx::CompilerContext;
 use natrix_core::parser::parse;
 use natrix_core::token::{TokenType, Tokenizer};
@@ -44,7 +44,7 @@ fn test_ast_interpreter(path: &Path) -> test_utils::TestResult {
     run_golden_test(path, |input| {
         let mut ctx = CompilerContext::default();
         let source_id = ctx.sources.add_from_string(input);
-        let result = parse(&mut ctx, source_id).and_then(|e| eval(&e));
+        let result = parse(&mut ctx, source_id).and_then(|stmt| run(&mut ctx, &stmt));
         match &result {
             Ok(value) => format!("{:?}", value),
             Err(error) => format!("{}", error.display_with(&ctx.sources)),

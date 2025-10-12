@@ -1,0 +1,3 @@
+<string>:2:5: error: variable "x" already defined
+var x = 20;
+    ^

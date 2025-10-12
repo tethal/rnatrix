@@ -1,27 +1,17 @@
-//! Recursive descent parser for expressions.
-//!
-//! # Span Invariant
-//!
-//! All AST nodes constructed by this parser have valid source spans (`span` field is `Some`).
-//! Parser code may safely `.unwrap()` spans on parsed expressions - a `None` indicates a parser bug.
-
-use crate::ast::{BinaryOp, Expr, ExprKind, UnaryOp};
+use crate::ast::{BinaryOp, Expr, ExprKind, Stmt, StmtKind, UnaryOp};
 use crate::ctx::{CompilerContext, Name};
-use crate::error::{NxError, NxResult};
+use crate::error::{err_at, NxError, NxResult};
 use crate::src::{SourceId, Span};
 use crate::token::{Token, TokenType, Tokenizer};
 use std::str::FromStr;
 
-pub type ParseResult = NxResult<Box<Expr>>;
+pub type ParseResult<T> = NxResult<T>;
 
-pub fn parse(ctx: &mut CompilerContext, source_id: SourceId) -> ParseResult {
+pub fn parse(ctx: &mut CompilerContext, source_id: SourceId) -> ParseResult<Stmt> {
     let mut parser = Parser::new(ctx, source_id)?;
-    let result = parser.expr()?;
-    if parser.tt() != TokenType::Eof {
-        parser.err(format!("unexpected token: {:?}", parser.tt()))
-    } else {
-        Ok(result)
-    }
+    let result = parser.block()?;
+    assert_eq!(parser.tt(), TokenType::Eof);
+    Ok(result)
 }
 
 struct Parser<'ctx> {
@@ -39,11 +29,68 @@ impl<'ctx> Parser<'ctx> {
         })
     }
 
-    fn expr(&mut self) -> ParseResult {
+    fn block(&mut self) -> ParseResult<Stmt> {
+        let mut stmts = Vec::new();
+        let start_span = self.span();
+        //         match(Kind.LBRACE);
+        //         while (token.kind() != Kind.RBRACE) {
+        while self.tt() != TokenType::Eof {
+            if self.tt() == TokenType::KwVar {
+                stmts.push(self.var_decl()?);
+            } else {
+                stmts.push(self.stmt()?);
+            }
+        }
+        let end_span = self.span();
+        //         match(Kind.RBRACE);
+        Ok(Stmt::new(
+            StmtKind::Block(stmts),
+            start_span.extend_to(end_span),
+        ))
+    }
+
+    fn var_decl(&mut self) -> ParseResult<Stmt> {
+        let start_span = self.expect(TokenType::KwVar)?.span;
+        let name_token = self.expect(TokenType::Identifier)?;
+        //         match(Kind.COLON);
+        //         TypeNode type = type();
+        self.expect(TokenType::Assign)?;
+        let init = self.expr()?;
+        let end_span = self.expect(TokenType::Semicolon)?.span;
+        Ok(Stmt::new(
+            StmtKind::VarDecl {
+                name: name_token.name.unwrap(),
+                name_span: name_token.span,
+                init,
+            },
+            start_span.extend_to(end_span),
+        ))
+    }
+
+    fn stmt(&mut self) -> ParseResult<Stmt> {
+        let expr = self.expr()?;
+        if self.tt() == TokenType::Assign {
+            self.consume()?.span;
+            let right = self.expr()?;
+            self.expect(TokenType::Semicolon)?;
+            if !expr.is_lvalue() {
+                err_at(expr.span, "expected lvalue on the left side of assignment")
+            } else {
+                let span = expr.span.extend_to(right.span);
+                Ok(Stmt::new(StmtKind::Assign { left: expr, right }, span))
+            }
+        } else {
+            self.expect(TokenType::Semicolon)?;
+            let span = expr.span;
+            Ok(Stmt::new(StmtKind::Expr(expr), span))
+        }
+    }
+
+    fn expr(&mut self) -> ParseResult<Expr> {
         self.additive()
     }
 
-    fn additive(&mut self) -> ParseResult {
+    fn additive(&mut self) -> ParseResult<Expr> {
         let mut left = self.multiplicative()?;
         loop {
             let op = match self.tt() {
@@ -53,20 +100,20 @@ impl<'ctx> Parser<'ctx> {
             };
             let op_span = self.consume()?.span;
             let right = self.multiplicative()?;
-            let span = left.span.unwrap().extend_to(right.span.unwrap());
-            left = Expr::boxed(
+            let span = left.span.extend_to(right.span);
+            left = Expr::new(
                 ExprKind::Binary {
                     op,
                     op_span,
-                    left,
-                    right,
+                    left: Box::new(left),
+                    right: Box::new(right),
                 },
                 span,
             )
         }
     }
 
-    fn multiplicative(&mut self) -> ParseResult {
+    fn multiplicative(&mut self) -> ParseResult<Expr> {
         let mut left = self.unary()?;
         loop {
             let op = match self.tt() {
@@ -76,29 +123,29 @@ impl<'ctx> Parser<'ctx> {
             };
             let op_span = self.consume()?.span;
             let right = self.unary()?;
-            let span = left.span.unwrap().extend_to(right.span.unwrap());
-            left = Expr::boxed(
+            let span = left.span.extend_to(right.span);
+            left = Expr::new(
                 ExprKind::Binary {
                     op,
                     op_span,
-                    left,
-                    right,
+                    left: Box::new(left),
+                    right: Box::new(right),
                 },
                 span,
             )
         }
     }
 
-    fn unary(&mut self) -> ParseResult {
+    fn unary(&mut self) -> ParseResult<Expr> {
         if self.tt() == TokenType::Minus {
             let op_span = self.consume()?.span;
             let expr = self.primary()?;
-            let span = op_span.extend_to(expr.span.unwrap());
-            Ok(Expr::boxed(
+            let span = op_span.extend_to(expr.span);
+            Ok(Expr::new(
                 ExprKind::Unary {
                     op: UnaryOp::Neg,
                     op_span,
-                    expr,
+                    expr: Box::new(expr),
                 },
                 span,
             ))
@@ -107,35 +154,34 @@ impl<'ctx> Parser<'ctx> {
         }
     }
 
-    fn primary(&mut self) -> ParseResult {
+    fn primary(&mut self) -> ParseResult<Expr> {
         match self.tt() {
             TokenType::IntLiteral => {
                 let span = self.span();
                 let value = i64::from_str(self.lexeme()).map_err(|e| self.error(e.to_string()))?;
                 self.consume()?;
-                Ok(Expr::boxed(ExprKind::IntLiteral(value), span))
+                Ok(Expr::new(ExprKind::IntLiteral(value), span))
             }
             TokenType::FloatLiteral => {
                 let span = self.span();
                 let value = f64::from_str(self.lexeme()).map_err(|e| self.error(e.to_string()))?;
                 self.consume()?;
-                Ok(Expr::boxed(ExprKind::FloatLiteral(value), span))
+                Ok(Expr::new(ExprKind::FloatLiteral(value), span))
             }
-            TokenType::KwTrue | TokenType::KwFalse => Ok(Expr::boxed(
+            TokenType::KwTrue | TokenType::KwFalse => Ok(Expr::new(
                 ExprKind::BoolLiteral(self.tt() == TokenType::KwTrue),
                 self.consume()?.span,
             )),
-            TokenType::KwNull => Ok(Expr::boxed(ExprKind::NullLiteral, self.consume()?.span)),
+            TokenType::KwNull => Ok(Expr::new(ExprKind::NullLiteral, self.consume()?.span)),
             TokenType::LParen => {
                 let span = self.consume()?.span;
                 let e = self.expr()?;
                 let span = span.extend_to(self.expect(TokenType::RParen)?.span);
-                Ok(Expr::boxed(ExprKind::Paren(e), span))
+                Ok(Expr::new(ExprKind::Paren(Box::new(e)), span))
             }
-            TokenType::Identifier => Ok(Expr::boxed(
-                ExprKind::Var(self.name()),
-                self.consume()?.span,
-            )),
+            TokenType::Identifier => {
+                Ok(Expr::new(ExprKind::Var(self.name()), self.consume()?.span))
+            }
             tt => self.err(format!("expected expression, not {:?}", tt)),
         }
     }
