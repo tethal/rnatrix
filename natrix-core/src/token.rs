@@ -1,60 +1,53 @@
+use crate::ctx::{CompilerContext, Interner, Name};
 use crate::error::{err_at, NxResult};
-use crate::src::{Cursor, Source, Span};
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum TokenType {
-    Eof,
-    Whitespace,
-    Comment,
-    KwTrue,
-    KwFalse,
-    KwNull,
-    Identifier,
-    IntLiteral,
-    FloatLiteral,
-    LParen,
-    RParen,
-    Plus,
-    Minus,
-    Star,
-    Slash,
-}
+use crate::src::{Cursor, SourceId, Span};
+pub use crate::token_type::TokenType;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Token {
     pub tt: TokenType,
     pub span: Span,
+    pub name: Option<Name>,
 }
 
-pub struct Tokenizer<'src> {
-    cursor: Cursor<'src>,
+pub struct Tokenizer<'ctx> {
+    cursor: Cursor<'ctx>,
+    interner: &'ctx mut Interner,
 }
 
-impl<'src> Tokenizer<'src> {
-    pub fn new(source: &'src Source) -> Tokenizer<'src> {
+impl<'ctx> Tokenizer<'ctx> {
+    pub fn new(ctx: &'ctx mut CompilerContext, source_id: SourceId) -> Tokenizer<'ctx> {
         Tokenizer {
-            cursor: Cursor::new(source),
+            cursor: Cursor::new(ctx.sources.get_by_id(source_id)),
+            interner: &mut ctx.interner,
         }
     }
 
     pub fn next_token(&mut self) -> NxResult<Token> {
         loop {
             self.cursor.mark();
-            let mut tt = self.parse_token_type()?;
+            let tt = self.parse_token_type()?;
+            if tt == TokenType::Comment || tt == TokenType::Whitespace {
+                continue;
+            }
             let span = self.cursor.span_from_mark();
             if tt == TokenType::Identifier {
                 let lexeme = self.cursor.lexeme(span);
-                tt = match lexeme {
-                    "true" => TokenType::KwTrue,
-                    "false" => TokenType::KwFalse,
-                    "null" => TokenType::KwNull,
-                    _ => TokenType::Identifier,
-                }
+                let name = self.interner.intern(lexeme);
+                return Ok(Token {
+                    tt: self
+                        .interner
+                        .resolve_keyword(name)
+                        .unwrap_or(TokenType::Identifier),
+                    span,
+                    name: Some(name),
+                });
             }
-            let token = Token { tt, span };
-            if token.tt != TokenType::Comment && token.tt != TokenType::Whitespace {
-                return Ok(token);
-            }
+            return Ok(Token {
+                tt,
+                span,
+                name: None,
+            });
         }
     }
 

@@ -1,4 +1,4 @@
-Token { tt: LParen, span: @0:0-1 }: "("
+Token { tt: LParen, span: @0:0-1, name: None }: "("
 <string>:1:3: error: unexpected character '@'
 ( @ )
   ^

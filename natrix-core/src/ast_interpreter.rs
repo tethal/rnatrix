@@ -19,6 +19,7 @@ pub fn eval(expr: &Expr) -> EvalResult {
             left,
             right,
         } => eval_binary(*op, *op_span, eval(left)?, eval(right)?),
+        ExprKind::Var(name) => err_at(expr.span.unwrap(), format!("undefined variable {:?}", name)),
     }
 }
 

@@ -6,15 +6,16 @@
 //! Parser code may safely `.unwrap()` spans on parsed expressions - a `None` indicates a parser bug.
 
 use crate::ast::{BinaryOp, Expr, ExprKind, UnaryOp};
+use crate::ctx::{CompilerContext, Name};
 use crate::error::{NxError, NxResult};
-use crate::src::{Source, Span};
+use crate::src::{SourceId, Span};
 use crate::token::{Token, TokenType, Tokenizer};
 use std::str::FromStr;
 
 pub type ParseResult = NxResult<Box<Expr>>;
 
-pub fn parse(source: &Source) -> ParseResult {
-    let mut parser = Parser::new(source)?;
+pub fn parse(ctx: &mut CompilerContext, source_id: SourceId) -> ParseResult {
+    let mut parser = Parser::new(ctx, source_id)?;
     let result = parser.expr()?;
     if parser.tt() != TokenType::Eof {
         parser.err(format!("unexpected token: {:?}", parser.tt()))
@@ -23,14 +24,14 @@ pub fn parse(source: &Source) -> ParseResult {
     }
 }
 
-struct Parser<'src> {
-    tokenizer: Tokenizer<'src>,
+struct Parser<'ctx> {
+    tokenizer: Tokenizer<'ctx>,
     current_token: Token,
 }
 
-impl<'src> Parser<'src> {
-    fn new(source: &'src Source) -> NxResult<Self> {
-        let mut tokenizer = Tokenizer::new(source);
+impl<'ctx> Parser<'ctx> {
+    fn new(ctx: &'ctx mut CompilerContext, source_id: SourceId) -> NxResult<Self> {
+        let mut tokenizer = Tokenizer::new(ctx, source_id);
         let current_token = tokenizer.next_token()?;
         Ok(Parser {
             tokenizer,
@@ -131,6 +132,10 @@ impl<'src> Parser<'src> {
                 let span = span.extend_to(self.expect(TokenType::RParen)?.span);
                 Ok(Expr::boxed(ExprKind::Paren(e), span))
             }
+            TokenType::Identifier => Ok(Expr::boxed(
+                ExprKind::Var(self.name()),
+                self.consume()?.span,
+            )),
             tt => self.err(format!("expected expression, not {:?}", tt)),
         }
     }
@@ -155,6 +160,10 @@ impl<'src> Parser<'src> {
 
     fn span(&self) -> Span {
         self.current_token.span
+    }
+
+    fn name(&self) -> Name {
+        self.current_token.name.unwrap()
     }
 
     fn lexeme(&self) -> &str {

@@ -1,7 +1,8 @@
-use crate::src::{Sources, Span};
+use crate::src::Span;
 use std::fmt::{self, Debug, Formatter};
 
 pub use crate::ast_debug::AstDebug;
+use crate::ctx::{CompilerContext, Name};
 
 #[derive(Debug, Copy, Clone)]
 pub enum BinaryOp {
@@ -33,6 +34,7 @@ pub enum ExprKind {
         left: Box<Expr>,
         right: Box<Expr>,
     },
+    Var(Name),
 }
 
 /// An expression node in the AST.
@@ -59,8 +61,8 @@ impl Expr {
         })
     }
 
-    pub fn debug_with<'a>(&'a self, sources: &'a Sources) -> AstDebug<'a> {
-        AstDebug::with_sources(self, sources)
+    pub fn debug_with<'a>(&'a self, ctx: &'a CompilerContext) -> AstDebug<'a> {
+        AstDebug::with_context(self, ctx)
     }
 }
 

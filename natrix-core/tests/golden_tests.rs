@@ -1,6 +1,6 @@
 use natrix_core::ast_interpreter::eval;
+use natrix_core::ctx::CompilerContext;
 use natrix_core::parser::parse;
-use natrix_core::src::Sources;
 use natrix_core::token::{TokenType, Tokenizer};
 use std::fmt::Write;
 use std::path::Path;
@@ -8,16 +8,15 @@ use test_utils::{datatest_stable, run_golden_test};
 
 fn test_tokenizer(path: &Path) -> test_utils::TestResult {
     run_golden_test(path, |input| {
-        let mut sources = Sources::default();
-        let source_id = sources.add_from_string(input);
-        let source = sources.get_by_id(source_id);
-        let mut tokenizer = Tokenizer::new(source);
+        let mut ctx = CompilerContext::default();
+        let source_id = ctx.sources.add_from_string(input);
+        let mut tokenizer = Tokenizer::new(&mut ctx, source_id);
         let mut result = String::new();
         loop {
             let token = match tokenizer.next_token() {
                 Ok(token) => token,
                 Err(error) => {
-                    writeln!(result, "{}", error.display_with(&sources)).unwrap();
+                    writeln!(result, "{}", error.display_with(&ctx.sources)).unwrap();
                     break;
                 }
             };
@@ -32,25 +31,23 @@ fn test_tokenizer(path: &Path) -> test_utils::TestResult {
 
 fn test_parser(path: &Path) -> test_utils::TestResult {
     run_golden_test(path, |input| {
-        let mut sources = Sources::default();
-        let source_id = sources.add_from_string(input);
-        let source = sources.get_by_id(source_id);
-        match parse(source) {
-            Ok(ast) => format!("{:?}", ast.debug_with(&sources)),
-            Err(error) => format!("{}", error.display_with(&sources)),
+        let mut ctx = CompilerContext::default();
+        let source_id = ctx.sources.add_from_string(input);
+        match parse(&mut ctx, source_id) {
+            Ok(ast) => format!("{:?}", ast.debug_with(&ctx)),
+            Err(error) => format!("{}", error.display_with(&ctx.sources)),
         }
     })
 }
 
 fn test_ast_interpreter(path: &Path) -> test_utils::TestResult {
     run_golden_test(path, |input| {
-        let mut sources = Sources::default();
-        let source_id = sources.add_from_string(input);
-        let source = sources.get_by_id(source_id);
-        let result = parse(source).and_then(|e| eval(&e));
+        let mut ctx = CompilerContext::default();
+        let source_id = ctx.sources.add_from_string(input);
+        let result = parse(&mut ctx, source_id).and_then(|e| eval(&e));
         match &result {
             Ok(value) => format!("{:?}", value),
-            Err(error) => format!("{}", error.display_with(&sources)),
+            Err(error) => format!("{}", error.display_with(&ctx.sources)),
         }
     })
 }

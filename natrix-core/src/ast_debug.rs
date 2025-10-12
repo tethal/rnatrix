@@ -1,11 +1,12 @@
 use crate::ast::{Expr, ExprKind};
-use crate::src::{Sources, Span};
+use crate::ctx::{CompilerContext, Name};
+use crate::src::Span;
 use std::fmt::{self, Debug, Formatter};
 
 /// Wrapper for displaying AST nodes with optional source context.
 pub struct AstDebug<'a> {
     expr: &'a Expr,
-    sources: Option<&'a Sources>,
+    ctx: Option<&'a CompilerContext>,
     indent: usize,
 }
 
@@ -13,15 +14,15 @@ impl<'a> AstDebug<'a> {
     pub fn new(expr: &'a Expr) -> Self {
         Self {
             expr,
-            sources: None,
+            ctx: None,
             indent: 0,
         }
     }
 
-    pub fn with_sources(expr: &'a Expr, sources: &'a Sources) -> Self {
+    pub fn with_context(expr: &'a Expr, ctx: &'a CompilerContext) -> Self {
         Self {
             expr,
-            sources: Some(sources),
+            ctx: Some(ctx),
             indent: 0,
         }
     }
@@ -29,15 +30,15 @@ impl<'a> AstDebug<'a> {
     fn indented(&self, expr: &'a Expr) -> Self {
         Self {
             expr,
-            sources: self.sources,
+            ctx: self.ctx,
             indent: self.indent + 2,
         }
     }
 
     fn fmt_span(&self, f: &mut Formatter<'_>, span: Span) -> fmt::Result {
         write!(f, " ")?;
-        if let Some(sources) = self.sources {
-            span.debug_with(sources).fmt(f)
+        if let Some(ctx) = self.ctx {
+            span.debug_with(&ctx.sources).fmt(f)
         } else {
             span.fmt(f)
         }
@@ -68,6 +69,16 @@ impl<'a> AstDebug<'a> {
     ) -> fmt::Result {
         self.fmt_begin_header(f, name)?;
         write!(f, "({:?})", value)?;
+        self.fmt_end_header(f)
+    }
+
+    fn fmt_header_with_name(&self, f: &mut Formatter<'_>, name: &str, value: Name) -> fmt::Result {
+        self.fmt_begin_header(f, name)?;
+        if let Some(ctx) = self.ctx {
+            write!(f, "{:?}", ctx.interner.resolve(value))?
+        } else {
+            write!(f, "{:?}", value)?
+        }
         self.fmt_end_header(f)
     }
 
@@ -116,6 +127,7 @@ impl Debug for AstDebug<'_> {
                 self.fmt_child(f, left)?;
                 self.fmt_child(f, right)
             }
+            ExprKind::Var(name) => self.fmt_header_with_name(f, "Var", *name),
         }
     }
 }
