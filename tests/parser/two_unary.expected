@@ -1,0 +1,7 @@
+Block @<string>:1-1:2-1
+  Expr @<string>:1:1-4
+    Unary @<string>:1:1-4
+      op: Not @<string>:1:1-2
+      Unary @<string>:1:2-4
+        op: Not @<string>:1:2-3
+        Var("a") @<string>:1:3-4

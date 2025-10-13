@@ -159,23 +159,6 @@ impl Debug for ExprDebug<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let span = self.expr.span;
         match &self.expr.kind {
-            ExprKind::IntLiteral(value) => self.fmt.header_with_value(f, "IntLiteral", span, value),
-            ExprKind::FloatLiteral(value) => {
-                self.fmt.header_with_value(f, "FloatLiteral", span, value)
-            }
-            ExprKind::BoolLiteral(value) => {
-                self.fmt.header_with_value(f, "BoolLiteral", span, value)
-            }
-            ExprKind::NullLiteral => self.fmt.header(f, "NullLiteral", span),
-            ExprKind::Paren(inner) => {
-                self.fmt.header(f, "Paren", span)?;
-                self.fmt.expr(f, inner)
-            }
-            ExprKind::Unary { op, op_span, expr } => {
-                self.fmt.header(f, "Unary", span)?;
-                self.fmt.property_with_span(f, "op", *op, *op_span)?;
-                self.fmt.expr(f, expr)
-            }
             ExprKind::Binary {
                 op,
                 op_span,
@@ -186,6 +169,34 @@ impl Debug for ExprDebug<'_> {
                 self.fmt.property_with_span(f, "op", *op, *op_span)?;
                 self.fmt.expr(f, left)?;
                 self.fmt.expr(f, right)
+            }
+            ExprKind::BoolLiteral(value) => {
+                self.fmt.header_with_value(f, "BoolLiteral", span, value)
+            }
+            ExprKind::FloatLiteral(value) => {
+                self.fmt.header_with_value(f, "FloatLiteral", span, value)
+            }
+            ExprKind::IntLiteral(value) => self.fmt.header_with_value(f, "IntLiteral", span, value),
+            ExprKind::LogicalBinary {
+                and,
+                op_span,
+                left,
+                right,
+            } => {
+                self.fmt.header(f, "LogicalBinary", span)?;
+                self.fmt.property_with_span(f, "and", and, *op_span)?;
+                self.fmt.expr(f, left)?;
+                self.fmt.expr(f, right)
+            }
+            ExprKind::NullLiteral => self.fmt.header(f, "NullLiteral", span),
+            ExprKind::Paren(inner) => {
+                self.fmt.header(f, "Paren", span)?;
+                self.fmt.expr(f, inner)
+            }
+            ExprKind::Unary { op, op_span, expr } => {
+                self.fmt.header(f, "Unary", span)?;
+                self.fmt.property_with_span(f, "op", *op, *op_span)?;
+                self.fmt.expr(f, expr)
             }
             ExprKind::Var(name) => self.fmt.header_with_name(f, "Var", span, *name),
         }
@@ -231,6 +242,10 @@ impl Debug for StmtDebug<'_> {
             }
             StmtKind::Expr(expr) => {
                 self.fmt.header(f, "Expr", span)?;
+                self.fmt.expr(f, expr)
+            }
+            StmtKind::Print(expr) => {
+                self.fmt.header(f, "Print", span)?;
                 self.fmt.expr(f, expr)
             }
             StmtKind::VarDecl {

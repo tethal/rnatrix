@@ -65,14 +65,57 @@ impl<'ctx> Tokenizer<'ctx> {
             Some('+') => Ok(TokenType::Plus),
             Some('-') => Ok(TokenType::Minus),
             Some('*') => Ok(TokenType::Star),
-            Some('/') => Ok(TokenType::Slash),
-            Some('=') => Ok(TokenType::Assign),
+            Some('/') => {
+                if self.cursor.peek() == Some('/') {
+                    while self.cursor.peek() != Some('\n') && self.cursor.peek() != None {
+                        self.cursor.advance();
+                    }
+                    Ok(TokenType::Comment)
+                } else {
+                    Ok(TokenType::Slash)
+                }
+            }
+            Some('%') => Ok(TokenType::Percent),
+            Some('=') => self.two_char_symbol('=', TokenType::Assign, TokenType::Eq),
+            Some('!') => self.two_char_symbol('=', TokenType::Bang, TokenType::Ne),
+            Some('>') => self.two_char_symbol('=', TokenType::Gt, TokenType::Ge),
+            Some('<') => self.two_char_symbol('=', TokenType::Lt, TokenType::Le),
+            Some('|') => {
+                if self.cursor.peek() == Some('|') {
+                    self.cursor.advance();
+                    Ok(TokenType::Or)
+                } else {
+                    err_at(self.cursor.span_from_mark(), "bitwise or not supported")
+                }
+            }
+            Some('&') => {
+                if self.cursor.peek() == Some('&') {
+                    self.cursor.advance();
+                    Ok(TokenType::And)
+                } else {
+                    err_at(self.cursor.span_from_mark(), "bitwise and not supported")
+                }
+            }
             Some(';') => Ok(TokenType::Semicolon),
             Some(c) => err_at(
                 self.cursor.span_from_mark(),
                 format!("unexpected character {:?}", c),
             ),
             None => Ok(TokenType::Eof),
+        }
+    }
+
+    fn two_char_symbol(
+        &mut self,
+        second_char: char,
+        one_char: TokenType,
+        two_char: TokenType,
+    ) -> NxResult<TokenType> {
+        if self.cursor.peek() == Some(second_char) {
+            self.cursor.advance();
+            Ok(two_char)
+        } else {
+            Ok(one_char)
         }
     }
 

@@ -1,0 +1,21 @@
+true
+false
+false
+false
+true
+true
+true
+false
+true
+false
+true
+false
+true
+false
+true
+false
+false
+true
+<string>:32:19: error: division by zero
+print(true && (10 / 0 > 0));
+                  ^

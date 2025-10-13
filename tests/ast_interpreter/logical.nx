@@ -1,0 +1,32 @@
+// Basic logical AND
+print(true && true);
+print(true && false);
+print(false && true);
+print(false && false);
+
+// Basic logical OR
+print(true || true);
+print(true || false);
+print(false || true);
+print(false || false);
+
+// Combining logical operators
+print(true && true && true);
+print(true && false && true);
+print(false || false || true);
+print(false || false || false);
+
+// With comparisons
+print(5 > 3 && 10 < 20);
+print(5 > 3 && 10 > 20);
+print(5 < 3 || 10 < 20);
+print(5 < 3 || 10 > 20);
+
+// Short-circuit AND - right side should not evaluate (would cause div by zero)
+print(false && (10 / 0 > 0));
+
+// Short-circuit OR - right side should not evaluate (would cause div by zero)
+print(true || (10 / 0 > 0));
+
+// Non-short-circuit cases that should error
+print(true && (10 / 0 > 0));

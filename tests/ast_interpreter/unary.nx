@@ -1,0 +1,20 @@
+// Integer negation
+print(-5);
+print(-(-5));
+print(-(10 + 5));
+
+// Float negation
+print(-5.5);
+print(-(-5.5));
+print(-(10.5 + 5.5));
+
+// Boolean negation
+print(!true);
+print(!false);
+print(!!true);
+print(!(5 > 3));
+
+// Combined unary operators
+print(-5 + 3);
+print(-(5 + 3));
+print(!true && false);

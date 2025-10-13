@@ -18,11 +18,12 @@ See [[README]] for project overview and design decisions.
 - [X] **Evaluator (expressions)** - Tree-walking evaluation of expressions, returns `Value`.
 - [X] **Error reporting** - review all test cases and improve the error messages.
 - [X] **Variables (let bindings)** - Add statements to parser, environment for name→value mapping.
-- [ ] **Control flow and scopes** - If/else, while loops.
+- [ ] **Functions** - Function declarations, function calls, return.
+- [ ] **Control flow and scopes** - If/else, while loops, break, continue.
 - [ ] **Strings** - Extend `Value`, add string literals and concatenation.
 - [ ] **Lists** - List literals, indexing operations.
-- [ ] **Functions (first-class)** - Lambda syntax, closures, function calls.
 - [ ] **Builtin functions** - Print, length, etc.
+- [ ] **Functions (first-class)** - Lambda syntax, closures, function calls.
 
 ### Rust Learning Focus
 

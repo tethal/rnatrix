@@ -68,26 +68,125 @@ impl<'ctx> Parser<'ctx> {
     }
 
     fn stmt(&mut self) -> ParseResult<Stmt> {
-        let expr = self.expr()?;
-        if self.tt() == TokenType::Assign {
-            self.consume()?.span;
-            let right = self.expr()?;
-            self.expect(TokenType::Semicolon)?;
-            if !expr.is_lvalue() {
-                err_at(expr.span, "expected lvalue on the left side of assignment")
-            } else {
-                let span = expr.span.extend_to(right.span);
-                Ok(Stmt::new(StmtKind::Assign { left: expr, right }, span))
+        match self.tt() {
+            TokenType::KwPrint => {
+                let start_span = self.consume()?.span;
+                let expr = self.expr()?;
+                let end_span = self.expect(TokenType::Semicolon)?.span;
+                Ok(Stmt::new(
+                    StmtKind::Print(expr),
+                    start_span.extend_to(end_span),
+                ))
             }
-        } else {
-            self.expect(TokenType::Semicolon)?;
-            let span = expr.span;
-            Ok(Stmt::new(StmtKind::Expr(expr), span))
+            _ => {
+                let expr = self.expr()?;
+                if self.tt() == TokenType::Assign {
+                    self.consume()?;
+                    let right = self.expr()?;
+                    self.expect(TokenType::Semicolon)?;
+                    if !expr.is_lvalue() {
+                        err_at(expr.span, "expected lvalue on the left side of assignment")
+                    } else {
+                        let span = expr.span.extend_to(right.span);
+                        Ok(Stmt::new(StmtKind::Assign { left: expr, right }, span))
+                    }
+                } else {
+                    self.expect(TokenType::Semicolon)?;
+                    let span = expr.span;
+                    Ok(Stmt::new(StmtKind::Expr(expr), span))
+                }
+            }
         }
     }
 
     fn expr(&mut self) -> ParseResult<Expr> {
-        self.additive()
+        self.logic_or()
+    }
+
+    fn logic_or(&mut self) -> ParseResult<Expr> {
+        let mut left = self.logic_and()?;
+        while self.tt() == TokenType::Or {
+            let op_span = self.consume()?.span;
+            let right = self.logic_and()?;
+            let span = left.span.extend_to(right.span);
+            left = Expr::new(
+                ExprKind::LogicalBinary {
+                    and: false,
+                    op_span,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                },
+                span,
+            )
+        }
+        Ok(left)
+    }
+
+    fn logic_and(&mut self) -> ParseResult<Expr> {
+        let mut left = self.equality()?;
+        while self.tt() == TokenType::And {
+            let op_span = self.consume()?.span;
+            let right = self.equality()?;
+            let span = left.span.extend_to(right.span);
+            left = Expr::new(
+                ExprKind::LogicalBinary {
+                    and: true,
+                    op_span,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                },
+                span,
+            )
+        }
+        Ok(left)
+    }
+
+    fn equality(&mut self) -> ParseResult<Expr> {
+        let mut left = self.comparison()?;
+        loop {
+            let op = match self.tt() {
+                TokenType::Eq => BinaryOp::Eq,
+                TokenType::Ne => BinaryOp::Ne,
+                _ => return Ok(left),
+            };
+            let op_span = self.consume()?.span;
+            let right = self.comparison()?;
+            let span = left.span.extend_to(right.span);
+            left = Expr::new(
+                ExprKind::Binary {
+                    op,
+                    op_span,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                },
+                span,
+            )
+        }
+    }
+
+    fn comparison(&mut self) -> ParseResult<Expr> {
+        let mut left = self.additive()?;
+        loop {
+            let op = match self.tt() {
+                TokenType::Lt => BinaryOp::Lt,
+                TokenType::Le => BinaryOp::Le,
+                TokenType::Gt => BinaryOp::Gt,
+                TokenType::Ge => BinaryOp::Ge,
+                _ => return Ok(left),
+            };
+            let op_span = self.consume()?.span;
+            let right = self.additive()?;
+            let span = left.span.extend_to(right.span);
+            left = Expr::new(
+                ExprKind::Binary {
+                    op,
+                    op_span,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                },
+                span,
+            )
+        }
     }
 
     fn additive(&mut self) -> ParseResult<Expr> {
@@ -119,6 +218,7 @@ impl<'ctx> Parser<'ctx> {
             let op = match self.tt() {
                 TokenType::Star => BinaryOp::Mul,
                 TokenType::Slash => BinaryOp::Div,
+                TokenType::Percent => BinaryOp::Mod,
                 _ => return Ok(left),
             };
             let op_span = self.consume()?.span;
@@ -137,21 +237,22 @@ impl<'ctx> Parser<'ctx> {
     }
 
     fn unary(&mut self) -> ParseResult<Expr> {
-        if self.tt() == TokenType::Minus {
-            let op_span = self.consume()?.span;
-            let expr = self.primary()?;
-            let span = op_span.extend_to(expr.span);
-            Ok(Expr::new(
-                ExprKind::Unary {
-                    op: UnaryOp::Neg,
-                    op_span,
-                    expr: Box::new(expr),
-                },
-                span,
-            ))
-        } else {
-            self.primary()
-        }
+        let op = match self.tt() {
+            TokenType::Bang => UnaryOp::Not,
+            TokenType::Minus => UnaryOp::Neg,
+            _ => return self.primary(),
+        };
+        let op_span = self.consume()?.span;
+        let expr = self.unary()?;
+        let span = op_span.extend_to(expr.span);
+        Ok(Expr::new(
+            ExprKind::Unary {
+                op,
+                op_span,
+                expr: Box::new(expr),
+            },
+            span,
+        ))
     }
 
     fn primary(&mut self) -> ParseResult<Expr> {

@@ -61,24 +61,24 @@ impl Value {
         matches!(self.0, ValueImpl::Float(_))
     }
 
-    pub fn as_bool(&self) -> Option<bool> {
+    pub fn unwrap_bool(&self) -> bool {
         match self.0 {
-            ValueImpl::Bool(v) => Some(v),
-            _ => None,
+            ValueImpl::Bool(v) => v,
+            _ => panic!("expected bool, got {:?}", self.get_type()),
         }
     }
 
-    pub fn as_int(&self) -> Option<i64> {
+    pub fn unwrap_int(&self) -> i64 {
         match self.0 {
-            ValueImpl::Int(v) => Some(v),
-            _ => None,
+            ValueImpl::Int(v) => v,
+            _ => panic!("expected int, got {:?}", self.get_type()),
         }
     }
 
-    pub fn as_float(&self) -> Option<f64> {
+    pub fn unwrap_float(&self) -> f64 {
         match self.0 {
-            ValueImpl::Float(v) => Some(v),
-            _ => None,
+            ValueImpl::Float(v) => v,
+            _ => panic!("expected float, got {:?}", self.get_type()),
         }
     }
 }

@@ -1,0 +1,47 @@
+// Integer comparisons
+print(5 == 5);
+print(5 == 6);
+print(5 != 5);
+print(5 != 6);
+print(5 < 6);
+print(5 < 5);
+print(5 <= 5);
+print(5 <= 6);
+print(5 > 4);
+print(5 > 5);
+print(5 >= 5);
+print(5 >= 4);
+
+// Float comparisons
+print(5.5 == 5.5);
+print(5.5 == 6.5);
+print(5.5 != 5.5);
+print(5.5 != 6.5);
+print(5.5 < 6.5);
+print(5.5 < 5.5);
+print(5.5 <= 5.5);
+print(5.5 <= 6.5);
+print(5.5 > 4.5);
+print(5.5 > 5.5);
+print(5.5 >= 5.5);
+print(5.5 >= 4.5);
+
+// Mixed int/float comparisons (int with float)
+print(5 == 5.0);
+print(5 < 5.5);
+print(5 <= 5.0);
+print(5 > 4.5);
+print(5 >= 5.0);
+
+// Mixed int/float comparisons (float with int)
+print(5.0 == 5);
+print(5.5 > 5);
+print(5.0 >= 5);
+print(4.5 < 5);
+print(5.0 <= 5);
+
+// Bool comparisons
+print(true == true);
+print(true == false);
+print(true != true);
+print(true != false);

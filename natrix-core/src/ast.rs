@@ -16,6 +16,7 @@ pub enum StmtKind {
     },
     Block(Vec<Stmt>),
     Expr(Expr),
+    Print(Expr),
     VarDecl {
         name: Name,
         name_span: Span,
@@ -45,29 +46,43 @@ pub enum BinaryOp {
     Sub,
     Mul,
     Div,
+    Mod,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum UnaryOp {
     Neg,
+    Not,
 }
 
 pub enum ExprKind {
-    IntLiteral(i64),
-    FloatLiteral(f64),
+    Binary {
+        op: BinaryOp,
+        op_span: Span,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
     BoolLiteral(bool),
+    FloatLiteral(f64),
+    IntLiteral(i64),
+    LogicalBinary {
+        and: bool,
+        op_span: Span,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
     NullLiteral,
     Paren(Box<Expr>),
     Unary {
         op: UnaryOp,
         op_span: Span,
         expr: Box<Expr>,
-    },
-    Binary {
-        op: BinaryOp,
-        op_span: Span,
-        left: Box<Expr>,
-        right: Box<Expr>,
     },
     Var(Name),
 }

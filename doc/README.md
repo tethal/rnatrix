@@ -128,8 +128,8 @@ pub struct Value(ValueImpl);  // ValueImpl is private
 impl Value {
     pub fn from_int(n: i64) -> Self { ... }
     pub fn from_float(n: f64) -> Self { ... }
-    pub fn as_int(&self) -> Option<i64> { ... }
-    pub fn as_float(&self) -> Option<f64> { ... }
+    pub fn unwrap_int(&self) -> i64 { ... }
+    pub fn unwrap_float(&self) -> f64 { ... }
     // ...
 }
 ```
