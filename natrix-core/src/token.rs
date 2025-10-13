@@ -62,6 +62,8 @@ impl<'ctx> Tokenizer<'ctx> {
             Some(c) if c.is_ascii_alphabetic() || c == '_' => self.do_identifier(),
             Some('(') => Ok(TokenType::LParen),
             Some(')') => Ok(TokenType::RParen),
+            Some('{') => Ok(TokenType::LBrace),
+            Some('}') => Ok(TokenType::RBrace),
             Some('+') => Ok(TokenType::Plus),
             Some('-') => Ok(TokenType::Minus),
             Some('*') => Ok(TokenType::Star),
@@ -96,6 +98,7 @@ impl<'ctx> Tokenizer<'ctx> {
                     err_at(self.cursor.span_from_mark(), "bitwise and not supported")
                 }
             }
+            Some(',') => Ok(TokenType::Comma),
             Some(';') => Ok(TokenType::Semicolon),
             Some(c) => err_at(
                 self.cursor.span_from_mark(),

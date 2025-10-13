@@ -1,2 +1,4 @@
-var a = 21;
-a = a * 2;
+fun main() {
+    var a = 21;
+    a = a * 2;
+}

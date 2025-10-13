@@ -19,6 +19,7 @@ See [[README]] for project overview and design decisions.
 - [X] **Error reporting** - review all test cases and improve the error messages.
 - [X] **Variables (let bindings)** - Add statements to parser, environment for name→value mapping.
 - [ ] **Functions** - Function declarations, function calls, return.
+- [ ] **Refactor operators** - Move from ast_interpreter to value.
 - [ ] **Control flow and scopes** - If/else, while loops, break, continue.
 - [ ] **Strings** - Extend `Value`, add string literals and concatenation.
 - [ ] **Lists** - List literals, indexing operations.

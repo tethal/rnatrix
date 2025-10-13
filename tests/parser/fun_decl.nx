@@ -1,0 +1,8 @@
+fun f1() {
+}
+
+fun f2(arg1) {
+}
+
+fun f3(arg1, arg2) {
+}

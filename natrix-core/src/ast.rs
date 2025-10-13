@@ -1,65 +1,48 @@
 use crate::src::Span;
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::Debug;
 
-use crate::ast_debug::{ExprDebug, StmtDebug};
-use crate::ctx::{CompilerContext, Name};
+use crate::ctx::Name;
 
-pub struct Stmt {
-    pub kind: StmtKind,
-    pub span: Span,
+macro_rules! ast_node {
+    ($name:ident { $($field_name:ident: $field_type:ty),+ $(,)? }) => {
+        pub struct $name {
+            $(pub $field_name: $field_type,)+
+        }
+
+        impl $name {
+            pub fn new($($field_name: $field_type),+) -> Self {
+                Self { $($field_name),+ }
+            }
+        }
+    };
 }
 
-pub enum StmtKind {
-    Assign {
-        left: Expr,
-        right: Expr,
-    },
-    Block(Vec<Stmt>),
-    Expr(Expr),
-    Print(Expr),
-    VarDecl {
-        name: Name,
-        name_span: Span,
-        init: Expr,
-    },
-}
+ast_node!(Program {
+    decls: Vec<FunDecl>,
+    span: Span,
+});
 
-impl Stmt {
-    pub fn new(kind: StmtKind, span: Span) -> Self {
-        Self { kind, span }
-    }
+ast_node!(FunDecl {
+    name: Name,
+    name_span: Span,
+    params: Vec<Param>,
+    body: Stmt,
+});
 
-    pub fn debug_with<'a>(&'a self, ctx: &'a CompilerContext) -> StmtDebug<'a> {
-        StmtDebug::with_context(self, ctx)
-    }
-}
+ast_node!(Param {
+    name: Name,
+    name_span: Span,
+});
 
-impl Debug for Stmt {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        StmtDebug::new(self).fmt(f)
-    }
-}
+ast_node!(Stmt {
+    kind: StmtKind,
+    span: Span,
+});
 
-#[derive(Debug, Copy, Clone)]
-pub enum BinaryOp {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    Eq,
-    Ne,
-    Lt,
-    Le,
-    Gt,
-    Ge,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum UnaryOp {
-    Neg,
-    Not,
-}
+ast_node!(Expr {
+    kind: ExprKind,
+    span: Span,
+});
 
 pub enum ExprKind {
     Binary {
@@ -87,27 +70,38 @@ pub enum ExprKind {
     Var(Name),
 }
 
-pub struct Expr {
-    pub kind: ExprKind,
-    pub span: Span,
+pub enum StmtKind {
+    Assign {
+        left: Expr,
+        right: Expr,
+    },
+    Block(Vec<Stmt>),
+    Expr(Expr),
+    Print(Expr),
+    VarDecl {
+        name: Name,
+        name_span: Span,
+        init: Expr,
+    },
 }
 
-impl Expr {
-    pub fn new(kind: ExprKind, span: Span) -> Self {
-        Self { kind, span }
-    }
-
-    pub fn debug_with<'a>(&'a self, ctx: &'a CompilerContext) -> ExprDebug<'a> {
-        ExprDebug::with_context(self, ctx)
-    }
-
-    pub fn is_lvalue(&self) -> bool {
-        matches!(self.kind, ExprKind::Var(_))
-    }
+#[derive(Debug, Copy, Clone)]
+pub enum BinaryOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
 }
 
-impl Debug for Expr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        ExprDebug::new(self).fmt(f)
-    }
+#[derive(Debug, Copy, Clone)]
+pub enum UnaryOp {
+    Neg,
+    Not,
 }

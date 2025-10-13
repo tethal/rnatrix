@@ -1,6 +1,6 @@
-use crate::ast::{BinaryOp, Expr, ExprKind, Stmt, StmtKind, UnaryOp};
+use crate::ast::{BinaryOp, Expr, ExprKind, FunDecl, Program, Stmt, StmtKind, UnaryOp};
 use crate::ctx::{CompilerContext, Name};
-use crate::error::{err_at, error_at, NxResult};
+use crate::error::{err, err_at, error_at, NxResult};
 use crate::src::Span;
 use crate::value::{Value, ValueType};
 use std::collections::hash_map::Entry;
@@ -33,14 +33,45 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
             .map_err(|e| error_at(span, e.to_string()))
     }
 
-    // TODO instead of stmt, accept a function and arguments, return the ret value
-    pub fn invoke(&mut self, stmt: &Stmt) -> NxResult<Value> {
+    fn find_fun_decl(program: &Program, name: Name) -> Option<&FunDecl> {
+        program.decls.iter().find(|decl| decl.name == name)
+    }
+
+    pub fn run(&mut self, program: &Program, args: Vec<Value>) -> NxResult<Value> {
+        let main_name = self.ctx.interner.lookup("main");
+        match main_name.and_then(|name| Self::find_fun_decl(program, name)) {
+            Some(fun_decl) => self.invoke(None, fun_decl, args),
+            None => err("no main function defined"),
+        }
+    }
+
+    pub fn invoke(
+        &mut self,
+        call_site_span: Option<Span>,
+        fun_decl: &FunDecl,
+        args: Vec<Value>,
+    ) -> NxResult<Value> {
+        if args.len() != fun_decl.params.len() {
+            return err_at(
+                call_site_span.unwrap_or(fun_decl.name_span),
+                format!(
+                    "function expects {} argument{}, but {} were provided",
+                    fun_decl.params.len(),
+                    if fun_decl.params.len() == 1 { "" } else { "s" },
+                    args.len()
+                ),
+            );
+        }
         let mut env = Env::new();
-        self.do_stmt(&mut env, stmt)
+        for (param, arg) in fun_decl.params.iter().zip(args) {
+            env.vars.insert(param.name, arg);
+        }
+        self.do_stmt(&mut env, &fun_decl.body)?;
+        Ok(Value::NULL)
     }
 
     // TODO return Action instead
-    fn do_stmt(&mut self, env: &mut Env, stmt: &Stmt) -> NxResult<Value> {
+    fn do_stmt(&mut self, env: &mut Env, stmt: &Stmt) -> NxResult<()> {
         match &stmt.kind {
             StmtKind::Assign { left, right } => {
                 let ExprKind::Var(name) = left.kind else {
@@ -53,23 +84,25 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                         format!("undeclared variable {:?}", self.ctx.interner.resolve(name)),
                     ),
                     Some(slot) => {
-                        *slot = val.clone();
-                        Ok(val)
+                        *slot = val;
+                        Ok(())
                     }
                 }
             }
             StmtKind::Block(stmts) => {
-                let mut result = Value::NULL;
                 for stmt in stmts {
-                    result = self.do_stmt(env, stmt)?;
+                    self.do_stmt(env, stmt)?;
                 }
-                Ok(result)
+                Ok(())
             }
-            StmtKind::Expr(expr) => self.eval(env, expr),
+            StmtKind::Expr(expr) => {
+                self.eval(env, expr)?;
+                Ok(())
+            }
             StmtKind::Print(expr) => {
                 let value = self.eval(env, expr)?;
                 self.print(expr.span, &value)?;
-                Ok(value)
+                Ok(())
             }
             StmtKind::VarDecl {
                 name,
@@ -78,7 +111,10 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
             } => {
                 let val = self.eval(env, init)?;
                 match env.vars.entry(*name) {
-                    Entry::Vacant(e) => Ok(e.insert(val).clone()),
+                    Entry::Vacant(e) => {
+                        e.insert(val);
+                        Ok(())
+                    }
                     Entry::Occupied(_) => err_at(
                         *name_span,
                         format!(

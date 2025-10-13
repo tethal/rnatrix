@@ -1,4 +1,4 @@
-use crate::ast::{BinaryOp, Expr, ExprKind, Stmt, StmtKind, UnaryOp};
+use crate::ast::{BinaryOp, Expr, ExprKind, FunDecl, Param, Program, Stmt, StmtKind, UnaryOp};
 use crate::ctx::{CompilerContext, Name};
 use crate::error::{err_at, NxError, NxResult};
 use crate::src::{SourceId, Span};
@@ -7,11 +7,14 @@ use std::str::FromStr;
 
 pub type ParseResult<T> = NxResult<T>;
 
-pub fn parse(ctx: &mut CompilerContext, source_id: SourceId) -> ParseResult<Stmt> {
+pub fn parse(ctx: &mut CompilerContext, source_id: SourceId) -> ParseResult<Program> {
     let mut parser = Parser::new(ctx, source_id)?;
-    let result = parser.block()?;
-    assert_eq!(parser.tt(), TokenType::Eof);
-    Ok(result)
+    let start_span = parser.span();
+    let mut fun_decls = Vec::new();
+    while parser.tt() != TokenType::Eof {
+        fun_decls.push(parser.fun_decl()?);
+    }
+    Ok(Program::new(fun_decls, start_span.extend_to(parser.span())))
 }
 
 struct Parser<'ctx> {
@@ -29,20 +32,48 @@ impl<'ctx> Parser<'ctx> {
         })
     }
 
+    fn fun_decl(&mut self) -> NxResult<FunDecl> {
+        self.expect(TokenType::KwFun)?;
+        let name_span = self.span();
+        let name = self.expect(TokenType::Identifier)?.name.unwrap();
+        let params = self.params()?;
+        let body = self.block()?;
+        Ok(FunDecl::new(name, name_span, params, body))
+    }
+
+    fn params(&mut self) -> NxResult<Vec<Param>> {
+        let mut params = Vec::new();
+        self.expect(TokenType::LParen)?;
+        if self.tt() != TokenType::RParen {
+            params.push(self.param()?);
+            while self.tt() == TokenType::Comma {
+                self.consume()?;
+                params.push(self.param()?);
+            }
+        };
+        self.expect(TokenType::RParen)?;
+        Ok(params)
+    }
+
+    fn param(&mut self) -> NxResult<Param> {
+        let name_span = self.span();
+        let name = self.expect(TokenType::Identifier)?.name.unwrap();
+        // match(Kind.COLON);
+        // TypeNode type = type();
+        Ok(Param::new(name, name_span))
+    }
+
     fn block(&mut self) -> ParseResult<Stmt> {
         let mut stmts = Vec::new();
-        let start_span = self.span();
-        //         match(Kind.LBRACE);
-        //         while (token.kind() != Kind.RBRACE) {
-        while self.tt() != TokenType::Eof {
+        let start_span = self.expect(TokenType::LBrace)?.span;
+        while self.tt() != TokenType::RBrace {
             if self.tt() == TokenType::KwVar {
                 stmts.push(self.var_decl()?);
             } else {
                 stmts.push(self.stmt()?);
             }
         }
-        let end_span = self.span();
-        //         match(Kind.RBRACE);
+        let end_span = self.expect(TokenType::RBrace)?.span;
         Ok(Stmt::new(
             StmtKind::Block(stmts),
             start_span.extend_to(end_span),
@@ -82,11 +113,11 @@ impl<'ctx> Parser<'ctx> {
                 let expr = self.expr()?;
                 if self.tt() == TokenType::Assign {
                     self.consume()?;
-                    let right = self.expr()?;
-                    self.expect(TokenType::Semicolon)?;
-                    if !expr.is_lvalue() {
+                    if !is_lvalue(&expr) {
                         err_at(expr.span, "expected lvalue on the left side of assignment")
                     } else {
+                        let right = self.expr()?;
+                        self.expect(TokenType::Semicolon)?;
                         let span = expr.span.extend_to(right.span);
                         Ok(Stmt::new(StmtKind::Assign { left: expr, right }, span))
                     }
@@ -327,4 +358,8 @@ impl<'ctx> Parser<'ctx> {
             span: Some(self.current_token.span),
         }
     }
+}
+
+fn is_lvalue(expr: &Expr) -> bool {
+    matches!(expr.kind, ExprKind::Var(_))
 }

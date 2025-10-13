@@ -80,6 +80,10 @@ impl Interner {
         let idx = name.0.get() as usize - 1;
         KEYWORDS.get(idx).map(|&(_, tt)| tt)
     }
+
+    pub fn lookup(&self, name: &str) -> Option<Name> {
+        self.map.get(name).copied()
+    }
 }
 
 #[cfg(test)]

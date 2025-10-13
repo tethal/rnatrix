@@ -60,6 +60,17 @@ impl Display for ErrorDisplay<'_> {
     }
 }
 
+pub fn err<T>(message: impl Into<String>) -> NxResult<T> {
+    Err(error(message))
+}
+
+pub fn error(message: impl Into<String>) -> NxError {
+    NxError {
+        message: message.into(),
+        span: None,
+    }
+}
+
 pub fn err_at<T>(span: Span, message: impl Into<String>) -> NxResult<T> {
     Err(error_at(span, message))
 }

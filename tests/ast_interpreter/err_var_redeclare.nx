@@ -1,2 +1,4 @@
-var x = 10;
-var x = 20;
+fun main() {
+    var x = 10;
+    var x = 20;
+}

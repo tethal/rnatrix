@@ -4,6 +4,7 @@ pub enum TokenType {
     Whitespace,
     Comment,
     KwFalse,
+    KwFun,
     KwNull,
     KwPrint,
     KwTrue,
@@ -13,6 +14,8 @@ pub enum TokenType {
     FloatLiteral,
     LParen,
     RParen,
+    LBrace,
+    RBrace,
     Plus,
     Minus,
     Star,
@@ -27,12 +30,14 @@ pub enum TokenType {
     Gt,
     Ge,
     Bang,
+    Comma,
     Semicolon,
     Assign,
 }
 
 pub const KEYWORDS: &[(&str, TokenType)] = &[
     ("false", TokenType::KwFalse),
+    ("fun", TokenType::KwFun),
     ("null", TokenType::KwNull),
     ("print", TokenType::KwPrint),
     ("true", TokenType::KwTrue),

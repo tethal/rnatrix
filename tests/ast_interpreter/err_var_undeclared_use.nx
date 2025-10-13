@@ -1,2 +1,4 @@
-var x = 10;
-x + y;
+fun main() {
+    var x = 10;
+    x + y;
+}

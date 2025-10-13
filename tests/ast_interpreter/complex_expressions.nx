@@ -1,28 +1,30 @@
-// Precedence and associativity
-print(2 + 3 * 4);
-print((2 + 3) * 4);
-print(10 - 5 - 2);
-print(10 - (5 - 2));
+fun main() {
+    // Precedence and associativity
+    print(2 + 3 * 4);
+    print((2 + 3) * 4);
+    print(10 - 5 - 2);
+    print(10 - (5 - 2));
 
-// Mixed operators with parentheses
-print((10 + 5) * (20 - 15));
-print(10 / 2 + 3 * 4);
-print((10 / 2 + 3) * 4);
+    // Mixed operators with parentheses
+    print((10 + 5) * (20 - 15));
+    print(10 / 2 + 3 * 4);
+    print((10 / 2 + 3) * 4);
 
-// Comparisons in expressions
-print((5 > 3) == true);
-print((5 < 3) == false);
-print(!(5 == 5) || (10 > 5));
+    // Comparisons in expressions
+    print((5 > 3) == true);
+    print((5 < 3) == false);
+    print(!(5 == 5) || (10 > 5));
 
-// Complex logical expressions
-print((5 > 3 && 10 < 20) || (15 == 15 && 2 != 3));
-print((5 < 3 || 10 < 20) && (15 == 15 || 2 == 3));
+    // Complex logical expressions
+    print((5 > 3 && 10 < 20) || (15 == 15 && 2 != 3));
+    print((5 < 3 || 10 < 20) && (15 == 15 || 2 == 3));
 
-// Nested negations and parentheses
-print(-(10 + -5));
-print(!!(true && false));
-print(-(5 * -3) + 10);
+    // Nested negations and parentheses
+    print(-(10 + -5));
+    print(!!(true && false));
+    print(-(5 * -3) + 10);
 
-// Float and int mixing in complex expressions
-print((10 + 5.5) * 2 - 3.0);
-print((10.0 / 2 + 3) >= (4.5 * 2));
+    // Float and int mixing in complex expressions
+    print((10 + 5.5) * 2 - 3.0);
+    print((10.0 / 2 + 3) >= (4.5 * 2));
+}

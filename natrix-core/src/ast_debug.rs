@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprKind, Stmt, StmtKind};
+use crate::ast::{Expr, ExprKind, FunDecl, Param, Program, Stmt, StmtKind};
 use crate::ctx::{CompilerContext, Name};
 use crate::src::Span;
 use std::fmt::{self, Debug, Formatter};
@@ -116,44 +116,131 @@ impl<'a> AstFormatter<'a> {
     fn indent_str(&self) -> String {
         " ".repeat(self.indent)
     }
+}
 
-    fn expr(&self, f: &mut Formatter<'_>, expr: &Expr) -> fmt::Result {
-        ExprDebug {
-            fmt: self.indented(),
-            expr,
+macro_rules! impl_ast_debug {
+    ($name:ident as $field:ident => $debug_name:ident) => {
+        struct $debug_name<'a> {
+            fmt: AstFormatter<'a>,
+            $field: &'a $name,
         }
-        .fmt(f)
-    }
 
-    fn stmt(&self, f: &mut Formatter<'_>, stmt: &Stmt) -> fmt::Result {
-        StmtDebug {
-            fmt: self.indented(),
-            stmt,
+        impl<'a> $debug_name<'a> {
+            pub fn new($field: &'a $name) -> Self {
+                Self {
+                    fmt: AstFormatter::new(),
+                    $field,
+                }
+            }
+
+            pub fn with_context($field: &'a $name, ctx: &'a CompilerContext) -> Self {
+                Self {
+                    fmt: AstFormatter::with_context(ctx),
+                    $field,
+                }
+            }
         }
-        .fmt(f)
+
+        impl $name {
+            pub fn debug_with<'a>(&'a self, ctx: &'a CompilerContext) -> impl Debug + 'a {
+                $debug_name::with_context(self, ctx)
+            }
+        }
+
+        impl Debug for $name {
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                $debug_name::new(self).fmt(f)
+            }
+        }
+
+        impl<'a> AstFormatter<'a> {
+            #[allow(dead_code)]
+            fn $field(&self, f: &mut Formatter<'_>, $field: &$name) -> fmt::Result {
+                $debug_name {
+                    fmt: self.indented(),
+                    $field,
+                }
+                .fmt(f)
+            }
+        }
+    };
+}
+
+impl_ast_debug!(Program as program => ProgramDebug);
+
+impl<'a> Debug for ProgramDebug<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt.header(f, "Program", self.program.span)?;
+        for d in self.program.decls.iter() {
+            self.fmt.fun_decl(f, d)?
+        }
+        Ok(())
     }
 }
 
-pub struct ExprDebug<'a> {
-    fmt: AstFormatter<'a>,
-    expr: &'a Expr,
-}
+impl_ast_debug!(FunDecl as fun_decl => FunDeclDebug);
 
-impl<'a> ExprDebug<'a> {
-    pub fn new(expr: &'a Expr) -> Self {
-        Self {
-            fmt: AstFormatter::new(),
-            expr,
+impl<'a> Debug for FunDeclDebug<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt
+            .header_with_name(f, "FunDecl", self.fun_decl.name_span, self.fun_decl.name)?;
+        for p in self.fun_decl.params.iter() {
+            self.fmt.param(f, p)?
         }
-    }
-
-    pub fn with_context(expr: &'a Expr, ctx: &'a CompilerContext) -> Self {
-        Self {
-            fmt: AstFormatter::with_context(ctx),
-            expr,
-        }
+        self.fmt.stmt(f, &self.fun_decl.body)
     }
 }
+
+impl_ast_debug!(Param as param => ParamDebug);
+
+impl<'a> Debug for ParamDebug<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt
+            .header_with_name(f, "Param", self.param.name_span, self.param.name)
+    }
+}
+
+impl_ast_debug!(Stmt as stmt => StmtDebug);
+
+impl Debug for StmtDebug<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let span = self.stmt.span;
+        match &self.stmt.kind {
+            StmtKind::Assign { left, right } => {
+                self.fmt.header(f, "Assign", span)?;
+                self.fmt.expr(f, left)?;
+                self.fmt.expr(f, right)
+            }
+            StmtKind::Block(stmts) => {
+                self.fmt.header(f, "Block", span)?;
+                for stmt in stmts {
+                    self.fmt.stmt(f, stmt)?;
+                }
+                Ok(())
+            }
+            StmtKind::Expr(expr) => {
+                self.fmt.header(f, "Expr", span)?;
+                self.fmt.expr(f, expr)
+            }
+            StmtKind::Print(expr) => {
+                self.fmt.header(f, "Print", span)?;
+                self.fmt.expr(f, expr)
+            }
+            StmtKind::VarDecl {
+                name,
+                name_span,
+                init,
+            } => {
+                self.fmt.header(f, "VarDecl", span)?;
+                self.fmt
+                    .property_name_with_span(f, "name", *name, *name_span)?;
+                self.fmt.expr(f, init)
+            }
+        }
+    }
+}
+
+impl_ast_debug!(Expr as expr => ExprDebug);
 
 impl Debug for ExprDebug<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -199,65 +286,6 @@ impl Debug for ExprDebug<'_> {
                 self.fmt.expr(f, expr)
             }
             ExprKind::Var(name) => self.fmt.header_with_name(f, "Var", span, *name),
-        }
-    }
-}
-
-pub struct StmtDebug<'a> {
-    fmt: AstFormatter<'a>,
-    stmt: &'a Stmt,
-}
-
-impl<'a> StmtDebug<'a> {
-    pub fn new(stmt: &'a Stmt) -> Self {
-        Self {
-            fmt: AstFormatter::new(),
-            stmt,
-        }
-    }
-
-    pub fn with_context(stmt: &'a Stmt, ctx: &'a CompilerContext) -> Self {
-        Self {
-            fmt: AstFormatter::with_context(ctx),
-            stmt,
-        }
-    }
-}
-
-impl Debug for StmtDebug<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let span = self.stmt.span;
-        match &self.stmt.kind {
-            StmtKind::Assign { left, right } => {
-                self.fmt.header(f, "Assign", span)?;
-                self.fmt.expr(f, left)?;
-                self.fmt.expr(f, right)
-            }
-            StmtKind::Block(stmts) => {
-                self.fmt.header(f, "Block", span)?;
-                for stmt in stmts {
-                    self.fmt.stmt(f, stmt)?;
-                }
-                Ok(())
-            }
-            StmtKind::Expr(expr) => {
-                self.fmt.header(f, "Expr", span)?;
-                self.fmt.expr(f, expr)
-            }
-            StmtKind::Print(expr) => {
-                self.fmt.header(f, "Print", span)?;
-                self.fmt.expr(f, expr)
-            }
-            StmtKind::VarDecl {
-                name,
-                name_span,
-                init,
-            } => {
-                self.fmt.header(f, "VarDecl", span)?;
-                self.fmt
-                    .property_name_with_span(f, "name", *name, *name_span)?;
-                self.fmt.expr(f, init)
-            }
         }
     }
 }

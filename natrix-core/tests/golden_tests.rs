@@ -44,15 +44,15 @@ fn test_ast_interpreter(path: &Path) -> test_utils::TestResult {
     run_golden_test(path, |input| {
         let mut ctx = CompilerContext::default();
         let source_id = ctx.sources.add_from_string(input);
-        let ast = match parse(&mut ctx, source_id) {
-            Ok(ast) => ast,
+        let program = match parse(&mut ctx, source_id) {
+            Ok(program) => program,
             Err(error) => {
                 return format!("{}", error.display_with(&ctx.sources));
             }
         };
         let mut output = Vec::new();
         let mut interpreter = Interpreter::with_output(&ctx, &mut output);
-        let result = interpreter.invoke(&ast);
+        let result = interpreter.run(&program, vec![]);
         let mut output = String::from_utf8(output).unwrap();
         if let Err(error) = result {
             writeln!(output, "{}", error.display_with(&ctx.sources)).unwrap();
