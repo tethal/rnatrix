@@ -17,6 +17,7 @@ pub enum TokenType {
     Identifier,
     IntLiteral,
     FloatLiteral,
+    StringLiteral,
     LParen,
     RParen,
     LBrace,

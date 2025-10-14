@@ -1,0 +1,6 @@
+fun main() {
+    print(float("42"));
+    print(float(4.2));
+    print(float(4));
+    print(float());
+}

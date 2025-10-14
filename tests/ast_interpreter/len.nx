@@ -1,0 +1,4 @@
+fun main() {
+    print(len("42"));
+    print(len());
+}

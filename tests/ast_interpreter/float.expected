@@ -1,0 +1,6 @@
+42.0
+4.2
+4.0
+<string>:5:11: error: float expects 1 argument
+    print(float());
+          ^^^^^

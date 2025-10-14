@@ -270,6 +270,24 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                     Some(fun_decl) => self.invoke(Some(*name_span), fun_decl, arg_values),
                     None => match self.ctx.interner.resolve(*name) {
                         // TODO: Replace string matching with Name-based builtin lookup or registry
+                        "float" => {
+                            if args.len() != 1 {
+                                return err_at(*name_span, "float expects 1 argument");
+                            }
+                            self.eval(env, &args[0])?.float(expr.span)
+                        }
+                        "int" => {
+                            if args.len() != 1 {
+                                return err_at(*name_span, "int expects 1 argument");
+                            }
+                            self.eval(env, &args[0])?.int(expr.span)
+                        }
+                        "len" => {
+                            if args.len() != 1 {
+                                return err_at(*name_span, "len expects 1 argument");
+                            }
+                            self.eval(env, &args[0])?.len(expr.span)
+                        }
                         "print" => {
                             if args.len() != 1 {
                                 return err_at(*name_span, "print expects 1 argument");
@@ -277,6 +295,12 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                             let val = self.eval(env, &args[0])?;
                             self.print(*name_span, &val)?;
                             Ok(Value::NULL)
+                        }
+                        "str" => {
+                            if args.len() != 1 {
+                                return err_at(*name_span, "str expects 1 argument");
+                            }
+                            Ok(self.eval(env, &args[0])?.str())
                         }
                         _ => err_at(
                             *name_span,
@@ -305,6 +329,7 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
             }
             ExprKind::NullLiteral => Ok(Value::NULL),
             ExprKind::Paren(inner) => self.eval(env, inner),
+            ExprKind::StringLiteral(value) => Ok(Value::from_string(value.clone())),
             ExprKind::Unary { op, op_span, expr } => {
                 let val = self.eval(env, expr)?;
                 match op {

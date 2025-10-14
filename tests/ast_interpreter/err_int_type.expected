@@ -1,0 +1,3 @@
+<string>:2:11: error: int cannot be applied to Null
+    print(int(null));
+          ^^^^^^^^^

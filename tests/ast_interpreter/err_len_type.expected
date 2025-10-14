@@ -1,0 +1,3 @@
+<string>:2:11: error: len cannot be applied to Int
+    print(len(42));
+          ^^^^^^^

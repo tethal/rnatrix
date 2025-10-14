@@ -100,6 +100,7 @@ impl<'ctx> Tokenizer<'ctx> {
             }
             Some(',') => Ok(TokenType::Comma),
             Some(';') => Ok(TokenType::Semicolon),
+            Some('"') => self.do_string_literal(),
             Some(c) => err_at(
                 self.cursor.span_from_mark(),
                 format!("unexpected character {:?}", c),
@@ -159,5 +160,50 @@ impl<'ctx> Tokenizer<'ctx> {
             self.cursor.advance();
         }
         Ok(TokenType::Identifier)
+    }
+
+    fn do_string_literal(&mut self) -> NxResult<TokenType> {
+        // Opening quote already consumed
+        loop {
+            match self.cursor.peek() {
+                None => {
+                    return err_at(self.cursor.span_from_mark(), "unterminated string literal");
+                }
+                Some('\n') => {
+                    return err_at(
+                        self.cursor.span_from_mark(),
+                        "unterminated string literal (newline in string)",
+                    );
+                }
+                Some('"') => {
+                    self.cursor.advance(); // Consume closing quote
+                    return Ok(TokenType::StringLiteral);
+                }
+                Some('\\') => {
+                    self.cursor.advance(); // Consume backslash
+                    match self.cursor.peek() {
+                        Some('"') | Some('\\') | Some('n') | Some('t') | Some('r')
+                        | Some('0') => {
+                            self.cursor.advance(); // Consume escape char
+                        }
+                        Some(c) => {
+                            return err_at(
+                                self.cursor.span_from_mark(),
+                                format!("unknown escape sequence: \\{}", c),
+                            );
+                        }
+                        None => {
+                            return err_at(
+                                self.cursor.span_from_mark(),
+                                "unterminated string literal (escape at end)",
+                            );
+                        }
+                    }
+                }
+                Some(_) => {
+                    self.cursor.advance(); // Regular character
+                }
+            }
+        }
     }
 }

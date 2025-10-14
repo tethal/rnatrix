@@ -1,0 +1,4 @@
+fun main() {
+    print("count: " + 42);
+    return 0;
+}

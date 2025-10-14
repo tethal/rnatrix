@@ -1,0 +1,4 @@
+fun main() {
+    print("abc" < 123);
+    return 0;
+}

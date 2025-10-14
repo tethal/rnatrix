@@ -316,6 +316,9 @@ impl Debug for ExprDebug<'_> {
                 self.fmt.header(f, "Paren", span)?;
                 self.fmt.expr(f, inner)
             }
+            ExprKind::StringLiteral(value) => {
+                self.fmt.header_with_value(f, "StringLiteral", span, value)
+            }
             ExprKind::Unary { op, op_span, expr } => {
                 self.fmt.header(f, "Unary", span)?;
                 self.fmt.property_with_span(f, "op", *op, *op_span)?;

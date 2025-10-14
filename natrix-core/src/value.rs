@@ -1,7 +1,8 @@
-use std::fmt::Display;
-
-use crate::error::{err_at, NxResult};
+use crate::error::{err_at, error_at, NxResult};
 use crate::src::Span;
+use std::fmt::Display;
+use std::rc::Rc;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueType {
@@ -9,6 +10,7 @@ pub enum ValueType {
     Bool,
     Int,
     Float,
+    String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -20,6 +22,7 @@ enum ValueImpl {
     Bool(bool),
     Int(i64),
     Float(f64),
+    String(Rc<String>),
 }
 
 impl Value {
@@ -39,12 +42,17 @@ impl Value {
         Value(ValueImpl::Float(v))
     }
 
+    pub fn from_string(v: Rc<String>) -> Self {
+        Value(ValueImpl::String(v))
+    }
+
     pub fn get_type(&self) -> ValueType {
         match self.0 {
             ValueImpl::Null => ValueType::Null,
             ValueImpl::Bool(_) => ValueType::Bool,
             ValueImpl::Int(_) => ValueType::Int,
             ValueImpl::Float(_) => ValueType::Float,
+            ValueImpl::String(_) => ValueType::String,
         }
     }
 
@@ -62,6 +70,14 @@ impl Value {
 
     pub fn is_float(&self) -> bool {
         matches!(self.0, ValueImpl::Float(_))
+    }
+
+    pub fn is_string(&self) -> bool {
+        matches!(self.0, ValueImpl::String(_))
+    }
+
+    pub fn is_numeric(&self) -> bool {
+        matches!(self.get_type(), ValueType::Int | ValueType::Float)
     }
 
     pub fn unwrap_bool(&self) -> bool {
@@ -85,6 +101,13 @@ impl Value {
         }
     }
 
+    pub fn unwrap_string(&self) -> Rc<String> {
+        match &self.0 {
+            ValueImpl::String(v) => v.clone(),
+            _ => panic!("expected string, got {:?}", self.get_type()),
+        }
+    }
+
     // Helper methods for operators
 
     fn to_f64(&self) -> f64 {
@@ -104,10 +127,7 @@ impl Value {
     }
 
     fn check_numeric_operands(&self, other: &Value, op: &str, op_span: Span) -> NxResult<()> {
-        let l_numeric = matches!(self.get_type(), ValueType::Int | ValueType::Float);
-        let r_numeric = matches!(other.get_type(), ValueType::Int | ValueType::Float);
-
-        if l_numeric && r_numeric {
+        if self.is_numeric() && other.is_numeric() {
             Ok(())
         } else {
             err_at(
@@ -125,6 +145,14 @@ impl Value {
     // Arithmetic operators
 
     pub fn add(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+        if self.is_string() && other.is_string() {
+            return Ok(Value::from_string(Rc::new(format!(
+                "{}{}",
+                self.unwrap_string(),
+                other.unwrap_string()
+            ))));
+        }
+
         self.check_numeric_operands(other, "+", op_span)?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
@@ -182,37 +210,44 @@ impl Value {
 
     // Comparison operators
 
-    pub fn eq(&self, other: &Value, op_span: Span) -> NxResult<Value> {
-        // Special case: bool equality
+    pub fn eq(&self, other: &Value, _op_span: Span) -> NxResult<Value> {
+        // Strings
+        if self.is_string() && other.is_string() {
+            return Ok(Value::from_bool(
+                self.unwrap_string() == other.unwrap_string(),
+            ));
+        }
+
+        // Bools
         if self.is_bool() && other.is_bool() {
             return Ok(Value::from_bool(self.unwrap_bool() == other.unwrap_bool()));
         }
 
-        self.check_numeric_operands(other, "==", op_span)?;
-
-        if let Some((l, r)) = self.as_i64_pair(other) {
-            Ok(Value::from_bool(l == r))
-        } else {
-            Ok(Value::from_bool(self.to_f64() == other.to_f64()))
+        // Numbers
+        if self.is_numeric() && other.is_numeric() {
+            return if let Some((l, r)) = self.as_i64_pair(other) {
+                Ok(Value::from_bool(l == r))
+            } else {
+                Ok(Value::from_bool(self.to_f64() == other.to_f64()))
+            };
         }
+
+        // Incompatible types are never equal
+        Ok(Value::from_bool(false))
     }
 
     pub fn ne(&self, other: &Value, op_span: Span) -> NxResult<Value> {
-        // Special case: bool inequality
-        if self.is_bool() && other.is_bool() {
-            return Ok(Value::from_bool(self.unwrap_bool() != other.unwrap_bool()));
-        }
-
-        self.check_numeric_operands(other, "!=", op_span)?;
-
-        if let Some((l, r)) = self.as_i64_pair(other) {
-            Ok(Value::from_bool(l != r))
-        } else {
-            Ok(Value::from_bool(self.to_f64() != other.to_f64()))
-        }
+        self.eq(other, op_span)
+            .map(|v| Value::from_bool(!v.unwrap_bool()))
     }
 
     pub fn lt(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+        if self.is_string() && other.is_string() {
+            return Ok(Value::from_bool(
+                self.unwrap_string() < other.unwrap_string(),
+            ));
+        }
+
         self.check_numeric_operands(other, "<", op_span)?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
@@ -223,6 +258,12 @@ impl Value {
     }
 
     pub fn le(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+        if self.is_string() && other.is_string() {
+            return Ok(Value::from_bool(
+                self.unwrap_string() <= other.unwrap_string(),
+            ));
+        }
+
         self.check_numeric_operands(other, "<=", op_span)?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
@@ -233,6 +274,12 @@ impl Value {
     }
 
     pub fn gt(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+        if self.is_string() && other.is_string() {
+            return Ok(Value::from_bool(
+                self.unwrap_string() > other.unwrap_string(),
+            ));
+        }
+
         self.check_numeric_operands(other, ">", op_span)?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
@@ -243,6 +290,12 @@ impl Value {
     }
 
     pub fn ge(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+        if self.is_string() && other.is_string() {
+            return Ok(Value::from_bool(
+                self.unwrap_string() >= other.unwrap_string(),
+            ));
+        }
+
         self.check_numeric_operands(other, ">=", op_span)?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
@@ -278,15 +331,60 @@ impl Value {
             )
         }
     }
+
+    // Other operations
+    pub fn str(&self) -> Value {
+        Value::from_string(Rc::new(format!("{}", self)))
+    }
+
+    pub fn len(&self, span: Span) -> NxResult<Value> {
+        match &self.0 {
+            ValueImpl::String(s) => Ok(Value::from_int(s.len() as i64)),
+            _ => err_at(
+                span,
+                format!("len cannot be applied to {:?}", self.get_type()),
+            ),
+        }
+    }
+
+    pub fn int(&self, span: Span) -> NxResult<Value> {
+        match &self.0 {
+            ValueImpl::Int(i) => Ok(Value::from_int(*i)),
+            // Truncates towards zero, saturates on overflow, NaN → 0
+            ValueImpl::Float(f) => Ok(Value::from_int(*f as i64)),
+            ValueImpl::String(s) => Ok(Value::from_int(
+                i64::from_str(s).map_err(|e| error_at(span, e.to_string()))?,
+            )),
+            _ => err_at(
+                span,
+                format!("int cannot be applied to {:?}", self.get_type()),
+            ),
+        }
+    }
+
+    pub fn float(&self, span: Span) -> NxResult<Value> {
+        match &self.0 {
+            ValueImpl::Int(i) => Ok(Value::from_float(*i as f64)),
+            ValueImpl::Float(f) => Ok(Value::from_float(*f)),
+            ValueImpl::String(s) => Ok(Value::from_float(
+                f64::from_str(s).map_err(|e| error_at(span, e.to_string()))?,
+            )),
+            _ => err_at(
+                span,
+                format!("float cannot be applied to {:?}", self.get_type()),
+            ),
+        }
+    }
 }
 
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.0 {
+        match &self.0 {
             ValueImpl::Null => write!(f, "null"),
             ValueImpl::Bool(v) => write!(f, "{}", v),
             ValueImpl::Int(v) => write!(f, "{}", v),
-            ValueImpl::Float(v) => write!(f, "{}", v),
+            ValueImpl::Float(v) => write!(f, "{:?}", v),
+            ValueImpl::String(v) => write!(f, "{}", v),
         }
     }
 }

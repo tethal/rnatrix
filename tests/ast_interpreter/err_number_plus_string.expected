@@ -1,0 +1,3 @@
+<string>:2:14: error: operator + cannot be applied to Int and String
+    print(42 + " is the answer");
+             ^

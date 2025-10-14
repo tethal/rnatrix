@@ -1,0 +1,6 @@
+fun main() {
+    print(int("42"));
+    print(int(4.2));
+    print(int(4));
+    print(int());
+}

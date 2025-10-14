@@ -1,0 +1,20 @@
+fun main() {
+    // Equality
+    print("abc" == "abc");
+    print("abc" == "def");
+    print("" == "");
+    print("abc" != "abc");
+    print("abc" != "def");
+
+    // Ordering
+    print("abc" < "def");
+    print("def" < "abc");
+    print("abc" <= "abc");
+    print("abc" <= "def");
+    print("def" > "abc");
+    print("abc" > "def");
+    print("abc" >= "abc");
+    print("def" >= "abc");
+
+    return 0;
+}

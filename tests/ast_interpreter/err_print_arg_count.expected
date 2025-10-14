@@ -1,0 +1,3 @@
+<string>:2:5: error: print expects 1 argument
+    print(1, 2);
+    ^^^^^

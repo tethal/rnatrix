@@ -1,7 +1,7 @@
+use crate::ctx::Name;
 use crate::src::Span;
 use std::fmt::Debug;
-
-use crate::ctx::Name;
+use std::rc::Rc;
 
 macro_rules! ast_node {
     ($name:ident { $($field_name:ident: $field_type:ty),+ $(,)? }) => {
@@ -67,6 +67,7 @@ pub enum ExprKind {
     },
     NullLiteral,
     Paren(Box<Expr>),
+    StringLiteral(Rc<String>),
     Unary {
         op: UnaryOp,
         op_span: Span,

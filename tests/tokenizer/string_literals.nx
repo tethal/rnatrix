@@ -1,0 +1,21 @@
+// Basic string literals
+"hello"
+"world"
+""
+
+// Strings with escape sequences
+"quote: \""
+"backslash: \\"
+"newline: \n"
+"tab: \t"
+"return: \r"
+"null: \0"
+
+// Multiple escapes in one string
+"line1\nline2\nline3"
+"path\\to\\file"
+"\"quoted\""
+
+// Complex combinations
+"tab\tthen\"quote"
+"\0\n\r\t\\\""

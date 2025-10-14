@@ -1,0 +1,6 @@
+42
+4
+4
+<string>:5:11: error: int expects 1 argument
+    print(int());
+          ^^^

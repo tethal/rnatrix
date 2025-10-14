@@ -1,0 +1,9 @@
+fun main() {
+    print("hello");
+    print("world");
+    print("");
+    print("quote: \"");
+    print("backslash: \\");
+    print("newline: \n");
+    return 0;
+}

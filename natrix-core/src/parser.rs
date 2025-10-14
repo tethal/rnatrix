@@ -3,6 +3,7 @@ use crate::ctx::CompilerContext;
 use crate::error::{err_at, NxError, NxResult};
 use crate::src::{SourceId, Span};
 use crate::token::{Token, TokenType, Tokenizer};
+use std::rc::Rc;
 use std::str::FromStr;
 
 pub type ParseResult<T> = NxResult<T>;
@@ -357,6 +358,12 @@ impl<'ctx> Parser<'ctx> {
                 self.consume()?.span,
             )),
             TokenType::KwNull => Ok(Expr::new(ExprKind::NullLiteral, self.consume()?.span)),
+            TokenType::StringLiteral => {
+                let span = self.span();
+                let value = Rc::new(decode_string_literal(self.lexeme()));
+                self.consume()?;
+                Ok(Expr::new(ExprKind::StringLiteral(value), span))
+            }
             TokenType::LParen => {
                 let span = self.consume()?.span;
                 let e = self.expr()?;
@@ -433,4 +440,30 @@ impl<'ctx> Parser<'ctx> {
 
 fn is_lvalue(expr: &Expr) -> bool {
     matches!(expr.kind, ExprKind::Var(_))
+}
+
+/// Decodes a string literal by removing surrounding quotes and processing escape sequences.
+/// Assumes the tokenizer has already validated the escape sequences.
+fn decode_string_literal(lexeme: &str) -> String {
+    let mut result = String::new();
+    let inner = &lexeme[1..lexeme.len() - 1]; // Remove quotes
+    let mut chars = inner.chars();
+
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('"') => result.push('"'),
+                Some('\\') => result.push('\\'),
+                Some('n') => result.push('\n'),
+                Some('t') => result.push('\t'),
+                Some('r') => result.push('\r'),
+                Some('0') => result.push('\0'),
+                _ => unreachable!("tokenizer should have validated escape sequences"),
+            }
+        } else {
+            result.push(c);
+        }
+    }
+
+    result
 }

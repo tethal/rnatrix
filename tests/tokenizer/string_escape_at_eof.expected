@@ -1,0 +1,3 @@
+<string>:1:1: error: unterminated string literal (escape at end)
+"escape at end: \
+^^^^^^^^^^^^^^^^^

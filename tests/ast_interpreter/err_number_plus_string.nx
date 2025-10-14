@@ -1,0 +1,4 @@
+fun main() {
+    print(42 + " is the answer");
+    return 0;
+}

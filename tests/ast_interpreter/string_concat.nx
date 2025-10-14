@@ -1,0 +1,11 @@
+fun main() {
+    print("Hello" + "World");
+    print("a" + "b" + "c");
+    print("" + "test");
+    print("test" + "");
+    print("" + "");
+    var x = "foo";
+    var y = "bar";
+    print(x + y);
+    return 0;
+}

@@ -154,6 +154,43 @@ impl Value {
   structures like environments
 - Integer/float distinction enables better native code generation later
 
+### String and Type Conversion Design
+
+**String representation and operations:**
+
+- **Immutable heap strings**: `Rc<String>` for shared ownership
+- **UTF-8 storage**: Strings store UTF-8 bytes internally
+- **Byte-level operations**: `len()` returns byte count, indexing (when implemented) operates on bytes, not Unicode characters
+- **Concatenation**: Only `string + string` works - no implicit conversion
+- **Comparison**: Supports all operators (`==`, `!=`, `<`, `<=`, `>`, `>=`) with lexicographic ordering
+
+**Type conversion philosophy:**
+
+- **Explicit conversions**: Following Python's approach - no implicit conversions
+    - `"count: " + 42` → error (must use `"count: " + str(42)`)
+    - `"42" + 1` → error (must use `int("42") + 1`)
+- **Builtins for conversion**: `str()`, `int()`, `float()`, `len()`
+
+**Equality special case:**
+
+- `==` and `!=` never error on incompatible types - they return `false`
+- Example: `42 == "42"` → `false`, not an error
+- Rationale: Matches JavaScript/Python/Lua behavior for dynamic typing
+- All other operators (`+`, `-`, `<`, etc.) require compatible types
+
+**Conversion semantics:**
+
+- `int()`: Accepts string (parsed), int (identity), float (truncates towards zero, saturates on overflow, NaN → 0)
+- `float()`: Accepts string (parsed), float (identity), int (exact conversion)
+- `str()`: Accepts any value, uses `Display` formatting
+- Follows Java/modern-Rust cast semantics rather than C undefined behavior
+
+**Rationale:**
+
+- Explicit conversions prevent bugs and make intent clear
+- Lenient equality enables flexible comparisons without verbosity
+- Documented cast behavior avoids surprises with edge cases (NaN, infinity, overflow)
+
 ### Source Representation and Spans
 
 **Index-based design with append-only source collection:**

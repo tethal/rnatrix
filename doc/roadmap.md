@@ -22,8 +22,9 @@ See [[README]] for project overview and design decisions.
 - [X] **Control flow and scopes** - If/else, while loops, break, continue.
 - [X] **Refactor operators** - Move from ast_interpreter to value.
 - [X] **Builtin functions** - Refactor print statement to builtin function (called via `Call` mechanism).
-- [ ] **Strings** - Heap-allocated strings (`Rc<String>`), literals, concatenation, comparison.
+- [X] **Strings** - Heap-allocated strings (`Rc<String>`), literals, concatenation, comparison.
 - [ ] **Lists** - Fixed-size lists (`Rc<RefCell<Vec<Value>>>`), literals, indexing, mutation via `list[i] = value`.
+- [ ] **Indexing for strings** - with bounds checking
 - [ ] **len() builtin** - Returns length of strings and lists as integer.
 
 ### Rust Learning Focus

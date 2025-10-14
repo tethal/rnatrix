@@ -1,0 +1,3 @@
+<string>:2:17: error: operator < cannot be applied to String and Int
+    print("abc" < 123);
+                ^

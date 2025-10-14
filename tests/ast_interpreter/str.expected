@@ -1,0 +1,8 @@
+null
+true
+42
+4.2
+abc
+<string>:7:11: error: str expects 1 argument
+    print(str());
+          ^^^
