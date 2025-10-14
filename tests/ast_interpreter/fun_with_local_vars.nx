@@ -1,6 +1,6 @@
 fun useVar(x) {
     var y = x + 1;
-    print y;
+    print(y);
 }
 
 fun main() {

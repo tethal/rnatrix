@@ -1,5 +1,5 @@
 fun compute(a, b, c) {
-    print a + b * c;
+    print(a + b * c);
 }
 
 fun main() {

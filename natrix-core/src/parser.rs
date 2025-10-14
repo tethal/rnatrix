@@ -133,15 +133,6 @@ impl<'ctx> Parser<'ctx> {
                     span,
                 ))
             }
-            TokenType::KwPrint => {
-                let start_span = self.consume()?.span;
-                let expr = self.expr()?;
-                let end_span = self.expect(TokenType::Semicolon)?.span;
-                Ok(Stmt::new(
-                    StmtKind::Print(expr),
-                    start_span.extend_to(end_span),
-                ))
-            }
             TokenType::KwReturn => {
                 let start_span = self.consume()?.span;
                 let expr = if self.tt() != TokenType::Semicolon {

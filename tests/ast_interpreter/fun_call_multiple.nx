@@ -3,7 +3,7 @@ fun double(x) {
 }
 
 fun main() {
-    print double(5);
-    print double(10);
-    print double(15);
+    print(double(5));
+    print(double(10));
+    print(double(15));
 }

@@ -21,7 +21,7 @@ See [[README]] for project overview and design decisions.
 - [X] **Functions** - Function declarations, function calls, return.
 - [X] **Control flow and scopes** - If/else, while loops, break, continue.
 - [X] **Refactor operators** - Move from ast_interpreter to value.
-- [ ] **Builtin functions** - Refactor print statement to builtin function (called via `Call` mechanism).
+- [X] **Builtin functions** - Refactor print statement to builtin function (called via `Call` mechanism).
 - [ ] **Strings** - Heap-allocated strings (`Rc<String>`), literals, concatenation, comparison.
 - [ ] **Lists** - Fixed-size lists (`Rc<RefCell<Vec<Value>>>`), literals, indexing, mutation via `list[i] = value`.
 - [ ] **len() builtin** - Returns length of strings and lists as integer.
@@ -206,6 +206,7 @@ Can compile to x64 and run at native speed
 Features that are interesting but not on the critical path for learning systems Rust:
 
 ### Language Features
+
 - [ ] Tuples - `(1, 2, 3)` for multiple returns
 - [ ] Dictionaries/Maps - `{"key": value}`
 - [ ] Closures/lambdas - `fn(x) { x + 1 }`, environment capture
@@ -217,12 +218,16 @@ Features that are interesting but not on the critical path for learning systems 
 - [ ] Modules/imports
 
 ### Built-in Functions & Methods
-- [ ] More builtins - `map()`, `filter()`, `range()`, `type()`, `str()`
-- [ ] String methods - `split()`, `join()`, `slice()`, `upper()`, `lower()`
+
+- [ ] More builtins - `map()`, `filter()`, `range()`, `type()`, `chr()`, `ord()`
+- [ ] String slicing - `s[1:3]`, `s[:5]`, `s[2:]`
+- [ ] String interpolation - `"count: {x}"` or similar
+- [ ] String methods - `split()`, `join()`, `upper()`, `lower()`, `trim()`
 - [ ] List growth - `push()`, `pop()`, `insert()`, `remove()`, `resize()`
 - [ ] List operations - `sort()`, `reverse()`, `concat()`
 
 ### Tooling & Infrastructure
+
 - [ ] Standard library
 - [ ] Package manager
 - [ ] Language server protocol (IDE support)

@@ -89,7 +89,6 @@ pub enum StmtKind {
         then_body: Box<Stmt>,
         else_body: Option<Box<Stmt>>,
     },
-    Print(Expr),
     Return(Option<Expr>),
     VarDecl {
         name: Name,

@@ -1,5 +1,5 @@
 fun test(x) {
-    print x;
+    print(x);
 }
 
 fun main() {

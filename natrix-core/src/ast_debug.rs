@@ -237,10 +237,6 @@ impl Debug for StmtDebug<'_> {
                 };
                 Ok(())
             }
-            StmtKind::Print(expr) => {
-                self.fmt.header(f, "Print", span)?;
-                self.fmt.expr(f, expr)
-            }
             StmtKind::Return(expr) => {
                 self.fmt.header(f, "Return", span)?;
                 if let Some(expr) = expr {

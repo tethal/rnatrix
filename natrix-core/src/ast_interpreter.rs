@@ -194,11 +194,6 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                     Ok(StmtFlow::Next)
                 }
             }
-            StmtKind::Print(expr) => {
-                let value = self.eval(env, expr)?;
-                self.print(expr.span, &value)?;
-                Ok(StmtFlow::Next)
-            }
             StmtKind::Return(expr) => {
                 let value = match expr {
                     Some(expr) => self.eval(env, expr)?,
@@ -273,10 +268,21 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                 }
                 match self.find_fun_decl(*name) {
                     Some(fun_decl) => self.invoke(Some(*name_span), fun_decl, arg_values),
-                    None => err_at(
-                        *name_span,
-                        format!("undeclared function {:?}", self.ctx.interner.resolve(*name)),
-                    ),
+                    None => match self.ctx.interner.resolve(*name) {
+                        // TODO: Replace string matching with Name-based builtin lookup or registry
+                        "print" => {
+                            if args.len() != 1 {
+                                return err_at(*name_span, "print expects 1 argument");
+                            }
+                            let val = self.eval(env, &args[0])?;
+                            self.print(*name_span, &val)?;
+                            Ok(Value::NULL)
+                        }
+                        _ => err_at(
+                            *name_span,
+                            format!("undeclared function {:?}", self.ctx.interner.resolve(*name)),
+                        ),
+                    },
                 }
             }
             ExprKind::FloatLiteral(value) => Ok(Value::from_float(*value)),
