@@ -1,0 +1,14 @@
+fun main() {
+    var x = 10;
+    print(x);
+    {
+        var x = 20;
+        print(x);
+        {
+            var x = 30;
+            print(x);
+        }
+        print(x);
+    }
+    print(x);
+}

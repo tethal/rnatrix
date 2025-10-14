@@ -34,6 +34,54 @@ enum StmtFlow {
     Continue(Span), // Skip to next loop iteration
 }
 
+struct Env {
+    vars: RefCell<HashMap<Name, Value>>,
+    parent: Option<Rc<Env>>,
+}
+
+impl Env {
+    fn new_root() -> Rc<Env> {
+        Rc::new(Env {
+            vars: RefCell::new(HashMap::new()),
+            parent: None,
+        })
+    }
+
+    fn new(parent: &Rc<Env>) -> Rc<Env> {
+        Rc::new(Self {
+            vars: RefCell::new(HashMap::new()),
+            parent: Some(parent.clone()),
+        })
+    }
+
+    fn lookup(&self, name: &Name) -> Option<Value> {
+        self.vars
+            .borrow()
+            .get(name)
+            .cloned()
+            .or_else(|| self.parent.as_ref()?.lookup(name))
+    }
+
+    fn declare(&self, name: Name, value: Value) -> Result<(), ()> {
+        match self.vars.borrow_mut().entry(name) {
+            Entry::Vacant(e) => {
+                e.insert(value);
+                Ok(())
+            }
+            Entry::Occupied(_) => Err(()),
+        }
+    }
+
+    fn assign(&self, name: Name, value: Value) -> Result<(), ()> {
+        if let Some(slot) = self.vars.borrow_mut().get_mut(&name) {
+            *slot = value;
+            Ok(())
+        } else {
+            self.parent.as_ref().ok_or(())?.assign(name, value)
+        }
+    }
+}
+
 impl<'ctx, W: Write> Interpreter<'ctx, W> {
     pub fn with_output(ctx: &'ctx CompilerContext, output: W) -> Self {
         Self {
@@ -82,11 +130,19 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                 ),
             );
         }
-        let mut env = Env::new_root();
+        let env = Env::new_root();
         for (param, arg) in fun_decl.params.iter().zip(args) {
-            env.vars.borrow_mut().insert(param.name, arg);
+            env.declare(param.name, arg).map_err(|_| {
+                error_at(
+                    param.name_span,
+                    format!(
+                        "parameter {} already defined",
+                        self.ctx.interner.resolve(param.name)
+                    ),
+                )
+            })?;
         }
-        match self.do_stmt(&mut env, &fun_decl.body)? {
+        match self.do_stmt(&env, &fun_decl.body)? {
             StmtFlow::Next => Ok(Value::NULL),
             StmtFlow::Return(value) => Ok(value),
             StmtFlow::Break(span) => err_at(span, "break outside a loop"),
@@ -101,16 +157,13 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                     unreachable!();
                 };
                 let val = self.eval(env, right)?;
-                match env.vars.borrow_mut().get_mut(&name) {
-                    None => err_at(
+                env.assign(name, val).map_err(|_| {
+                    error_at(
                         left.span,
                         format!("undeclared variable {:?}", self.ctx.interner.resolve(name)),
-                    ),
-                    Some(slot) => {
-                        *slot = val;
-                        Ok(StmtFlow::Next)
-                    }
-                }
+                    )
+                })?;
+                Ok(StmtFlow::Next)
             }
             StmtKind::Block(stmts) => {
                 let inner_env = Env::new(env);
@@ -144,19 +197,16 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                 init,
             } => {
                 let val = self.eval(env, init)?;
-                match env.vars.borrow_mut().entry(*name) {
-                    Entry::Vacant(e) => {
-                        e.insert(val);
-                        Ok(StmtFlow::Next)
-                    }
-                    Entry::Occupied(_) => err_at(
+                env.declare(*name, val).map_err(|_| {
+                    error_at(
                         *name_span,
                         format!(
                             "variable {:?} already defined",
                             self.ctx.interner.resolve(*name)
                         ),
-                    ),
-                }
+                    )
+                })?;
+                Ok(StmtFlow::Next)
             }
         }
     }
@@ -211,7 +261,7 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                 eval_unary(*op, *op_span, self.eval(env, expr)?)
             }
             ExprKind::Var(name) => match env.lookup(name) {
-                Some(val) => Ok(val.clone()),
+                Some(val) => Ok(val),
                 None => err_at(
                     expr.span,
                     format!("undeclared variable {:?}", self.ctx.interner.resolve(*name)),
@@ -227,35 +277,6 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
         } else {
             Ok(value.unwrap_bool())
         }
-    }
-}
-
-struct Env {
-    vars: RefCell<HashMap<Name, Value>>,
-    parent: Option<Rc<Env>>,
-}
-
-impl Env {
-    fn new_root() -> Rc<Env> {
-        Rc::new(Env {
-            vars: RefCell::new(HashMap::new()),
-            parent: None,
-        })
-    }
-
-    fn new(parent: &Rc<Env>) -> Rc<Env> {
-        Rc::new(Self {
-            vars: RefCell::new(HashMap::new()),
-            parent: Some(parent.clone()),
-        })
-    }
-
-    fn lookup(&self, name: &Name) -> Option<Value> {
-        self.vars
-            .borrow()
-            .get(name)
-            .cloned()
-            .or_else(|| self.parent.as_ref()?.lookup(name))
     }
 }
 

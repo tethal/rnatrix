@@ -1,0 +1,3 @@
+<string>:1:10: error: parameter a already defined
+fun f(a, a) {
+         ^

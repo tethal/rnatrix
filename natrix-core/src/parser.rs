@@ -100,6 +100,7 @@ impl<'ctx> Parser<'ctx> {
 
     fn stmt(&mut self) -> ParseResult<Stmt> {
         match self.tt() {
+            TokenType::LBrace => self.block(),
             TokenType::KwPrint => {
                 let start_span = self.consume()?.span;
                 let expr = self.expr()?;
