@@ -1,5 +1,5 @@
 use crate::ast::{BinaryOp, Expr, ExprKind, FunDecl, Param, Program, Stmt, StmtKind, UnaryOp};
-use crate::ctx::{CompilerContext, Name};
+use crate::ctx::CompilerContext;
 use crate::error::{err_at, NxError, NxResult};
 use crate::src::{SourceId, Span};
 use crate::token::{Token, TokenType, Tokenizer};
@@ -106,6 +106,19 @@ impl<'ctx> Parser<'ctx> {
                 let end_span = self.expect(TokenType::Semicolon)?.span;
                 Ok(Stmt::new(
                     StmtKind::Print(expr),
+                    start_span.extend_to(end_span),
+                ))
+            }
+            TokenType::KwReturn => {
+                let start_span = self.consume()?.span;
+                let expr = if self.tt() != TokenType::Semicolon {
+                    Some(self.expr()?)
+                } else {
+                    None
+                };
+                let end_span = self.expect(TokenType::Semicolon)?.span;
+                Ok(Stmt::new(
+                    StmtKind::Return(expr),
                     start_span.extend_to(end_span),
                 ))
             }
@@ -312,7 +325,30 @@ impl<'ctx> Parser<'ctx> {
                 Ok(Expr::new(ExprKind::Paren(Box::new(e)), span))
             }
             TokenType::Identifier => {
-                Ok(Expr::new(ExprKind::Var(self.name()), self.consume()?.span))
+                let name_span = self.span();
+                let name = self.consume()?.name.unwrap();
+                if self.tt() == TokenType::LParen {
+                    self.consume()?;
+                    let mut args = vec![];
+                    if self.tt() != TokenType::RParen {
+                        args.push(self.expr()?);
+                        while self.tt() == TokenType::Comma {
+                            self.consume()?;
+                            args.push(self.expr()?);
+                        }
+                    }
+                    let span = name_span.extend_to(self.expect(TokenType::RParen)?.span);
+                    Ok(Expr::new(
+                        ExprKind::Call {
+                            name,
+                            name_span,
+                            args,
+                        },
+                        span,
+                    ))
+                } else {
+                    Ok(Expr::new(ExprKind::Var(name), name_span))
+                }
             }
             tt => self.err(format!("expected expression, not {:?}", tt)),
         }
@@ -338,10 +374,6 @@ impl<'ctx> Parser<'ctx> {
 
     fn span(&self) -> Span {
         self.current_token.span
-    }
-
-    fn name(&self) -> Name {
-        self.current_token.name.unwrap()
     }
 
     fn lexeme(&self) -> &str {

@@ -9,12 +9,15 @@ fn parse_and_eval(ctx: &mut CompilerContext, src: &str) -> NxResult<Value> {
     let program = parse(ctx, source_id)?;
     println!("{:?}", program.debug_with(&ctx));
     let mut interpreter = Interpreter::new(ctx);
-    interpreter.run(&program, vec![Value::from_int(35)])
+    interpreter.run(program, vec![Value::from_int(35)])
 }
 
 fn main() {
     let mut ctx = CompilerContext::default();
-    let result = parse_and_eval(&mut ctx, "fun main(a) { print a + 7; }");
+    let result = parse_and_eval(
+        &mut ctx,
+        "fun x(b, c) { return b + c; } fun main(a) { print x(a, 7); return 11; }",
+    );
     match result {
         Ok(value) => println!("Result: {}", value),
         Err(err) => println!("{}", err.display_with(&ctx.sources)),

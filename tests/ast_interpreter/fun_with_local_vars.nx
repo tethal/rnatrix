@@ -1,0 +1,8 @@
+fun useVar(x) {
+    var y = x + 1;
+    print y;
+}
+
+fun main() {
+    useVar(10);
+}

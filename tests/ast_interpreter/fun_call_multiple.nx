@@ -1,0 +1,9 @@
+fun double(x) {
+    return x * 2;
+}
+
+fun main() {
+    print double(5);
+    print double(10);
+    print double(15);
+}

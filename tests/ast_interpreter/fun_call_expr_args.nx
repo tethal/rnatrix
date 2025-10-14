@@ -1,0 +1,7 @@
+fun compute(a, b, c) {
+    print a + b * c;
+}
+
+fun main() {
+    compute(1, 2, 3);
+}

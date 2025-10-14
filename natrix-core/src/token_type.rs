@@ -7,6 +7,7 @@ pub enum TokenType {
     KwFun,
     KwNull,
     KwPrint,
+    KwReturn,
     KwTrue,
     KwVar,
     Identifier,
@@ -40,6 +41,7 @@ pub const KEYWORDS: &[(&str, TokenType)] = &[
     ("fun", TokenType::KwFun),
     ("null", TokenType::KwNull),
     ("print", TokenType::KwPrint),
+    ("return", TokenType::KwReturn),
     ("true", TokenType::KwTrue),
     ("var", TokenType::KwVar),
 ];

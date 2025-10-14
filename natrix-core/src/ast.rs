@@ -52,6 +52,11 @@ pub enum ExprKind {
         right: Box<Expr>,
     },
     BoolLiteral(bool),
+    Call {
+        name: Name,
+        name_span: Span,
+        args: Vec<Expr>,
+    },
     FloatLiteral(f64),
     IntLiteral(i64),
     LogicalBinary {
@@ -78,6 +83,7 @@ pub enum StmtKind {
     Block(Vec<Stmt>),
     Expr(Expr),
     Print(Expr),
+    Return(Option<Expr>),
     VarDecl {
         name: Name,
         name_span: Span,

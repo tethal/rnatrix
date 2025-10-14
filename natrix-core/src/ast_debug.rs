@@ -226,6 +226,14 @@ impl Debug for StmtDebug<'_> {
                 self.fmt.header(f, "Print", span)?;
                 self.fmt.expr(f, expr)
             }
+            StmtKind::Return(expr) => {
+                self.fmt.header(f, "Return", span)?;
+                if let Some(expr) = expr {
+                    self.fmt.expr(f, expr)
+                } else {
+                    Ok(())
+                }
+            }
             StmtKind::VarDecl {
                 name,
                 name_span,
@@ -259,6 +267,17 @@ impl Debug for ExprDebug<'_> {
             }
             ExprKind::BoolLiteral(value) => {
                 self.fmt.header_with_value(f, "BoolLiteral", span, value)
+            }
+            ExprKind::Call {
+                name,
+                name_span,
+                args,
+            } => {
+                self.fmt.header_with_name(f, "Call", *name_span, *name)?;
+                for a in args {
+                    self.fmt.expr(f, a)?;
+                }
+                Ok(())
             }
             ExprKind::FloatLiteral(value) => {
                 self.fmt.header_with_value(f, "FloatLiteral", span, value)

@@ -1,0 +1,3 @@
+<string>:6:5: error: function expects 2 arguments, but 3 were provided
+    add(1, 2, 3);
+    ^^^

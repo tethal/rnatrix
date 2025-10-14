@@ -52,7 +52,7 @@ fn test_ast_interpreter(path: &Path) -> test_utils::TestResult {
         };
         let mut output = Vec::new();
         let mut interpreter = Interpreter::with_output(&ctx, &mut output);
-        let result = interpreter.run(&program, vec![]);
+        let result = interpreter.run(program, vec![]);
         let mut output = String::from_utf8(output).unwrap();
         if let Err(error) = result {
             writeln!(output, "{}", error.display_with(&ctx.sources)).unwrap();

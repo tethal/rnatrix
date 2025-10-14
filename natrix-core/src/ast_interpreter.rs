@@ -3,14 +3,17 @@ use crate::ctx::{CompilerContext, Name};
 use crate::error::{err, err_at, error_at, NxResult};
 use crate::src::Span;
 use crate::value::{Value, ValueType};
+use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::io;
 use std::io::Write;
+use std::rc::Rc;
 
 pub struct Interpreter<'ctx, W: Write = io::Stdout> {
     ctx: &'ctx CompilerContext,
     output: W,
+    functions: HashMap<Name, Rc<FunDecl>>,
 }
 
 impl<'ctx> Interpreter<'ctx, io::Stdout> {
@@ -18,13 +21,26 @@ impl<'ctx> Interpreter<'ctx, io::Stdout> {
         Self {
             ctx,
             output: io::stdout(),
+            functions: HashMap::new(),
         }
     }
 }
 
+#[derive(Debug, Clone)]
+enum StmtFlow {
+    Next,           // Normal execution continues
+    Return(Value),  // Early return from function
+    Break(Span),    // Exit innermost loop
+    Continue(Span), // Skip to next loop iteration
+}
+
 impl<'ctx, W: Write> Interpreter<'ctx, W> {
     pub fn with_output(ctx: &'ctx CompilerContext, output: W) -> Self {
-        Self { ctx, output }
+        Self {
+            ctx,
+            output,
+            functions: HashMap::new(),
+        }
     }
 
     fn print(&mut self, span: Span, value: &Value) -> NxResult<()> {
@@ -33,13 +49,17 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
             .map_err(|e| error_at(span, e.to_string()))
     }
 
-    fn find_fun_decl(program: &Program, name: Name) -> Option<&FunDecl> {
-        program.decls.iter().find(|decl| decl.name == name)
+    fn find_fun_decl(&self, name: Name) -> Option<Rc<FunDecl>> {
+        self.functions.get(&name).cloned()
     }
 
-    pub fn run(&mut self, program: &Program, args: Vec<Value>) -> NxResult<Value> {
+    pub fn run(&mut self, program: Program, args: Vec<Value>) -> NxResult<Value> {
         let main_name = self.ctx.interner.lookup("main");
-        match main_name.and_then(|name| Self::find_fun_decl(program, name)) {
+        for decl in program.decls {
+            self.functions.insert(decl.name, Rc::new(decl));
+        }
+        let fun_decl_opt = main_name.and_then(|name| self.find_fun_decl(name));
+        match fun_decl_opt {
             Some(fun_decl) => self.invoke(None, fun_decl, args),
             None => err("no main function defined"),
         }
@@ -48,7 +68,7 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
     pub fn invoke(
         &mut self,
         call_site_span: Option<Span>,
-        fun_decl: &FunDecl,
+        fun_decl: Rc<FunDecl>,
         args: Vec<Value>,
     ) -> NxResult<Value> {
         if args.len() != fun_decl.params.len() {
@@ -62,47 +82,61 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                 ),
             );
         }
-        let mut env = Env::new();
+        let mut env = Env::new_root();
         for (param, arg) in fun_decl.params.iter().zip(args) {
-            env.vars.insert(param.name, arg);
+            env.vars.borrow_mut().insert(param.name, arg);
         }
-        self.do_stmt(&mut env, &fun_decl.body)?;
-        Ok(Value::NULL)
+        match self.do_stmt(&mut env, &fun_decl.body)? {
+            StmtFlow::Next => Ok(Value::NULL),
+            StmtFlow::Return(value) => Ok(value),
+            StmtFlow::Break(span) => err_at(span, "break outside a loop"),
+            StmtFlow::Continue(span) => err_at(span, "continue outside a loop"),
+        }
     }
 
-    // TODO return Action instead
-    fn do_stmt(&mut self, env: &mut Env, stmt: &Stmt) -> NxResult<()> {
+    fn do_stmt(&mut self, env: &Rc<Env>, stmt: &Stmt) -> NxResult<StmtFlow> {
         match &stmt.kind {
             StmtKind::Assign { left, right } => {
                 let ExprKind::Var(name) = left.kind else {
                     unreachable!();
                 };
                 let val = self.eval(env, right)?;
-                match env.vars.get_mut(&name) {
+                match env.vars.borrow_mut().get_mut(&name) {
                     None => err_at(
                         left.span,
                         format!("undeclared variable {:?}", self.ctx.interner.resolve(name)),
                     ),
                     Some(slot) => {
                         *slot = val;
-                        Ok(())
+                        Ok(StmtFlow::Next)
                     }
                 }
             }
             StmtKind::Block(stmts) => {
+                let inner_env = Env::new(env);
                 for stmt in stmts {
-                    self.do_stmt(env, stmt)?;
+                    let flow = self.do_stmt(&inner_env, stmt)?;
+                    if !matches!(flow, StmtFlow::Next) {
+                        return Ok(flow);
+                    }
                 }
-                Ok(())
+                Ok(StmtFlow::Next)
             }
             StmtKind::Expr(expr) => {
                 self.eval(env, expr)?;
-                Ok(())
+                Ok(StmtFlow::Next)
             }
             StmtKind::Print(expr) => {
                 let value = self.eval(env, expr)?;
                 self.print(expr.span, &value)?;
-                Ok(())
+                Ok(StmtFlow::Next)
+            }
+            StmtKind::Return(expr) => {
+                let value = match expr {
+                    Some(expr) => self.eval(env, expr)?,
+                    None => Value::NULL,
+                };
+                Ok(StmtFlow::Return(value))
             }
             StmtKind::VarDecl {
                 name,
@@ -110,10 +144,10 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                 init,
             } => {
                 let val = self.eval(env, init)?;
-                match env.vars.entry(*name) {
+                match env.vars.borrow_mut().entry(*name) {
                     Entry::Vacant(e) => {
                         e.insert(val);
-                        Ok(())
+                        Ok(StmtFlow::Next)
                     }
                     Entry::Occupied(_) => err_at(
                         *name_span,
@@ -127,7 +161,7 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
         }
     }
 
-    fn eval(&mut self, env: &mut Env, expr: &Expr) -> NxResult<Value> {
+    fn eval(&mut self, env: &Rc<Env>, expr: &Expr) -> NxResult<Value> {
         match &expr.kind {
             ExprKind::Binary {
                 op,
@@ -136,6 +170,23 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                 right,
             } => eval_binary(*op, *op_span, self.eval(env, left)?, self.eval(env, right)?),
             ExprKind::BoolLiteral(value) => Ok(Value::from_bool(*value)),
+            ExprKind::Call {
+                name,
+                name_span,
+                args,
+            } => {
+                let mut arg_values = Vec::with_capacity(args.len());
+                for arg in args {
+                    arg_values.push(self.eval(env, arg)?);
+                }
+                match self.find_fun_decl(*name) {
+                    Some(fun_decl) => self.invoke(Some(*name_span), fun_decl, arg_values),
+                    None => err_at(
+                        *name_span,
+                        format!("undeclared function {:?}", self.ctx.interner.resolve(*name)),
+                    ),
+                }
+            }
             ExprKind::FloatLiteral(value) => Ok(Value::from_float(*value)),
             ExprKind::IntLiteral(value) => Ok(Value::from_int(*value)),
             ExprKind::LogicalBinary {
@@ -159,7 +210,7 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
             ExprKind::Unary { op, op_span, expr } => {
                 eval_unary(*op, *op_span, self.eval(env, expr)?)
             }
-            ExprKind::Var(name) => match env.vars.get(name) {
+            ExprKind::Var(name) => match env.lookup(name) {
                 Some(val) => Ok(val.clone()),
                 None => err_at(
                     expr.span,
@@ -169,7 +220,7 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
         }
     }
 
-    fn eval_bool(&mut self, env: &mut Env, expr: &Expr) -> NxResult<bool> {
+    fn eval_bool(&mut self, env: &Rc<Env>, expr: &Expr) -> NxResult<bool> {
         let value = self.eval(env, expr)?;
         if value.get_type() != ValueType::Bool {
             err_at(expr.span, "expected a boolean value")
@@ -180,14 +231,31 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
 }
 
 struct Env {
-    vars: HashMap<Name, Value>,
+    vars: RefCell<HashMap<Name, Value>>,
+    parent: Option<Rc<Env>>,
 }
 
 impl Env {
-    fn new() -> Self {
-        Self {
-            vars: HashMap::new(),
-        }
+    fn new_root() -> Rc<Env> {
+        Rc::new(Env {
+            vars: RefCell::new(HashMap::new()),
+            parent: None,
+        })
+    }
+
+    fn new(parent: &Rc<Env>) -> Rc<Env> {
+        Rc::new(Self {
+            vars: RefCell::new(HashMap::new()),
+            parent: Some(parent.clone()),
+        })
+    }
+
+    fn lookup(&self, name: &Name) -> Option<Value> {
+        self.vars
+            .borrow()
+            .get(name)
+            .cloned()
+            .or_else(|| self.parent.as_ref()?.lookup(name))
     }
 }
 

@@ -1,0 +1,7 @@
+fun add(a, b) {
+    print a + b;
+}
+
+fun main() {
+    add(5);
+}

@@ -1,0 +1,7 @@
+fun test(x) {
+    print x;
+}
+
+fun main() {
+    test(undeclaredVar);
+}
