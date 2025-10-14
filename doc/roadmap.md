@@ -20,11 +20,11 @@ See [[README]] for project overview and design decisions.
 - [X] **Variables (let bindings)** - Add statements to parser, environment for name→value mapping.
 - [X] **Functions** - Function declarations, function calls, return.
 - [X] **Control flow and scopes** - If/else, while loops, break, continue.
-- [ ] **Refactor operators** - Move from ast_interpreter to value.
-- [ ] **Strings** - Extend `Value`, add string literals and concatenation.
-- [ ] **Lists** - List literals, indexing operations.
-- [ ] **Builtin functions** - Print, length, etc.
-- [ ] **Functions (first-class)** - Lambda syntax, closures, function calls.
+- [X] **Refactor operators** - Move from ast_interpreter to value.
+- [ ] **Builtin functions** - Refactor print statement to builtin function (called via `Call` mechanism).
+- [ ] **Strings** - Heap-allocated strings (`Rc<String>`), literals, concatenation, comparison.
+- [ ] **Lists** - Fixed-size lists (`Rc<RefCell<Vec<Value>>>`), literals, indexing, mutation via `list[i] = value`.
+- [ ] **len() builtin** - Returns length of strings and lists as integer.
 
 ### Rust Learning Focus
 
@@ -39,7 +39,8 @@ See [[README]] for project overview and design decisions.
 ### Memory Management Strategy
 
 - **Sources/Spans:** Index-based design with append-only collection (see [[README#Source Representation and Spans]])
-- **Runtime values:** Just `Rc<>` for heap values, accept memory leaks from cycles
+- **Runtime values:** `Rc<>` for immutable heap values (strings), `Rc<RefCell<>>` for mutable structures (lists)
+- **Reference cycles:** Accepted in Phase 1 (foundation for learning GC in Phase 4)
 
 ---
 
@@ -200,15 +201,32 @@ Can compile to x64 and run at native speed
 
 ---
 
-## Future Possibilities
+## Deferred Features (Phase 5+)
 
-After Phase 5, could explore:
+Features that are interesting but not on the critical path for learning systems Rust:
 
-- Concurrency primitives
-- Module system
-- Standard library
-- Package manager
-- Language server protocol (IDE support)
-- Self-hosting (compiler written in itself)
+### Language Features
+- [ ] Tuples - `(1, 2, 3)` for multiple returns
+- [ ] Dictionaries/Maps - `{"key": value}`
+- [ ] Closures/lambdas - `fn(x) { x + 1 }`, environment capture
+- [ ] For loops - `for x in list { }`
+- [ ] Iterators/generators
+- [ ] User-defined structs/classes with fields
+- [ ] Method call syntax - `obj.method(args)`
+- [ ] Exception handling - try/catch
+- [ ] Modules/imports
 
-Don't think about these until much later!
+### Built-in Functions & Methods
+- [ ] More builtins - `map()`, `filter()`, `range()`, `type()`, `str()`
+- [ ] String methods - `split()`, `join()`, `slice()`, `upper()`, `lower()`
+- [ ] List growth - `push()`, `pop()`, `insert()`, `remove()`, `resize()`
+- [ ] List operations - `sort()`, `reverse()`, `concat()`
+
+### Tooling & Infrastructure
+- [ ] Standard library
+- [ ] Package manager
+- [ ] Language server protocol (IDE support)
+- [ ] Self-hosting (compiler written in itself)
+- [ ] Concurrency primitives
+
+Don't think about these until Phase 1-4 are complete!
