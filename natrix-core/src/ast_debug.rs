@@ -218,9 +218,24 @@ impl Debug for StmtDebug<'_> {
                 }
                 Ok(())
             }
+            StmtKind::Break => self.fmt.header(f, "Break", span),
+            StmtKind::Continue => self.fmt.header(f, "Continue", span),
             StmtKind::Expr(expr) => {
                 self.fmt.header(f, "Expr", span)?;
                 self.fmt.expr(f, expr)
+            }
+            StmtKind::If {
+                cond,
+                then_body,
+                else_body,
+            } => {
+                self.fmt.header(f, "If", span)?;
+                self.fmt.expr(f, cond)?;
+                self.fmt.stmt(f, then_body)?;
+                if let Some(else_body) = else_body {
+                    self.fmt.stmt(f, else_body)?;
+                };
+                Ok(())
             }
             StmtKind::Print(expr) => {
                 self.fmt.header(f, "Print", span)?;
@@ -243,6 +258,12 @@ impl Debug for StmtDebug<'_> {
                 self.fmt
                     .property_name_with_span(f, "name", *name, *name_span)?;
                 self.fmt.expr(f, init)
+            }
+            StmtKind::While { cond, body } => {
+                self.fmt.header(f, "While", span)?;
+                self.fmt.expr(f, cond)?;
+                self.fmt.stmt(f, body)?;
+                Ok(())
             }
         }
     }

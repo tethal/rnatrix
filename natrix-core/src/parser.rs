@@ -101,6 +101,38 @@ impl<'ctx> Parser<'ctx> {
     fn stmt(&mut self) -> ParseResult<Stmt> {
         match self.tt() {
             TokenType::LBrace => self.block(),
+            TokenType::KwBreak => {
+                let span = self.consume()?.span;
+                let span = span.extend_to(self.expect(TokenType::Semicolon)?.span);
+                Ok(Stmt::new(StmtKind::Break, span))
+            }
+            TokenType::KwContinue => {
+                let span = self.consume()?.span;
+                let span = span.extend_to(self.expect(TokenType::Semicolon)?.span);
+                Ok(Stmt::new(StmtKind::Continue, span))
+            }
+            TokenType::KwIf => {
+                let start_span = self.consume()?.span;
+                self.expect(TokenType::LParen)?;
+                let cond = self.expr()?;
+                self.expect(TokenType::RParen)?;
+                let then_body = self.stmt()?;
+                let else_body = if self.tt() == TokenType::KwElse {
+                    self.consume()?;
+                    Some(self.stmt()?)
+                } else {
+                    None
+                };
+                let span = start_span.extend_to(else_body.as_ref().unwrap_or(&then_body).span);
+                Ok(Stmt::new(
+                    StmtKind::If {
+                        cond,
+                        then_body: Box::new(then_body),
+                        else_body: else_body.map(|body| Box::new(body)),
+                    },
+                    span,
+                ))
+            }
             TokenType::KwPrint => {
                 let start_span = self.consume()?.span;
                 let expr = self.expr()?;
@@ -121,6 +153,21 @@ impl<'ctx> Parser<'ctx> {
                 Ok(Stmt::new(
                     StmtKind::Return(expr),
                     start_span.extend_to(end_span),
+                ))
+            }
+            TokenType::KwWhile => {
+                let start_span = self.consume()?.span;
+                self.expect(TokenType::LParen)?;
+                let cond = self.expr()?;
+                self.expect(TokenType::RParen)?;
+                let body = self.stmt()?;
+                let span = start_span.extend_to(body.span);
+                Ok(Stmt::new(
+                    StmtKind::While {
+                        cond,
+                        body: Box::new(body),
+                    },
+                    span,
                 ))
             }
             _ => {

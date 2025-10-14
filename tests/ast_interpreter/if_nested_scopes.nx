@@ -1,0 +1,11 @@
+fun main() {
+    var x = 10;
+    if (x > 5) {
+        var x = 20;
+        print(x);
+    } else {
+        var x = 30;
+        print(x);
+    }
+    print(x);
+}

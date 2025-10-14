@@ -175,9 +175,24 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                 }
                 Ok(StmtFlow::Next)
             }
+            StmtKind::Break => Ok(StmtFlow::Break(stmt.span)),
+            StmtKind::Continue => Ok(StmtFlow::Continue(stmt.span)),
             StmtKind::Expr(expr) => {
                 self.eval(env, expr)?;
                 Ok(StmtFlow::Next)
+            }
+            StmtKind::If {
+                cond,
+                then_body,
+                else_body,
+            } => {
+                if self.eval_bool(env, cond)? {
+                    self.do_stmt(env, then_body)
+                } else if let Some(else_body) = else_body {
+                    self.do_stmt(env, else_body)
+                } else {
+                    Ok(StmtFlow::Next)
+                }
             }
             StmtKind::Print(expr) => {
                 let value = self.eval(env, expr)?;
@@ -206,6 +221,17 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                         ),
                     )
                 })?;
+                Ok(StmtFlow::Next)
+            }
+            StmtKind::While { cond, body } => {
+                while self.eval_bool(env, cond)? {
+                    match self.do_stmt(&env, body)? {
+                        StmtFlow::Next => {}
+                        StmtFlow::Break(_) => break,
+                        StmtFlow::Continue(_) => continue,
+                        StmtFlow::Return(value) => return Ok(StmtFlow::Return(value)),
+                    }
+                }
                 Ok(StmtFlow::Next)
             }
         }

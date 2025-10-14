@@ -1,0 +1,3 @@
+<string>:4:9: error: break outside a loop
+        break;
+        ^^^^^^

@@ -16,7 +16,7 @@ fn main() {
     let mut ctx = CompilerContext::default();
     let result = parse_and_eval(
         &mut ctx,
-        "fun x(b, c) { return b + c; } fun main(a) { print x(a, 7); return 11; }",
+        "fun x(n) { var s = 0; while (n > 0) { s = s + n; n = n - 1; } return s; } fun main(a) { print x(6); return 11; }",
     );
     match result {
         Ok(value) => println!("Result: {}", value),

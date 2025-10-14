@@ -81,13 +81,24 @@ pub enum StmtKind {
         right: Expr,
     },
     Block(Vec<Stmt>),
+    Break,
+    Continue,
     Expr(Expr),
+    If {
+        cond: Expr,
+        then_body: Box<Stmt>,
+        else_body: Option<Box<Stmt>>,
+    },
     Print(Expr),
     Return(Option<Expr>),
     VarDecl {
         name: Name,
         name_span: Span,
         init: Expr,
+    },
+    While {
+        cond: Expr,
+        body: Box<Stmt>,
     },
 }
 

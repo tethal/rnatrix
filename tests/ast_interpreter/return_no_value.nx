@@ -1,0 +1,7 @@
+fun main() {
+    print(1);
+    if (true) {
+        return;
+    }
+    print(2);
+}
