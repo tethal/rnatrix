@@ -2,9 +2,9 @@
 
 ## What This Project Is
 
-A Rust learning project focused on building a complete programming language implementation from scratch. The goal is to
-learn Rust concepts in a meaningful way by progressing from high-level safe code to low-level `unsafe` concepts through
-practical compiler/interpreter construction.
+A Rust learning project focused on building a complete programming language ("Natrix") implementation from scratch. The
+goal is to learn Rust concepts in a meaningful way by progressing from high-level safe code to low-level `unsafe`
+concepts through practical compiler/interpreter construction.
 
 **Primary Goal:** Learn Rust deeply through hands-on implementation
 **Secondary Goal:** Understand language implementation (parsers, compilers, VMs, type systems, code generation)
