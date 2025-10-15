@@ -1,0 +1,36 @@
+fun pascal(rows) {
+    var triangle = [[1]];
+    var row_num = 1;
+
+    while (row_num < rows) {
+        var prev_row = triangle[row_num - 1];
+        var new_row = [1];
+
+        var i = 0;
+        while (i < len(prev_row) - 1) {
+            new_row = new_row + [prev_row[i] + prev_row[i + 1]];
+            i = i + 1;
+        }
+
+        new_row = new_row + [1];
+        triangle = triangle + [new_row];
+        row_num = row_num + 1;
+    }
+
+    return triangle;
+}
+
+fun print_triangle(triangle) {
+    var i = 0;
+    while (i < len(triangle)) {
+        print(triangle[i]);
+        i = i + 1;
+    }
+}
+
+fun main(n) {
+    var triangle = pascal(n);
+    print("Pascal's Triangle (" + str(n) + " rows):");
+    print_triangle(triangle);
+    return 0;
+}

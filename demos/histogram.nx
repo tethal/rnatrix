@@ -1,0 +1,16 @@
+fun histogram(data) {
+    print("Histogram:");
+    var i = 0;
+    while (i < len(data)) {
+        var label = str(i + 1);
+        var bar = "=" * data[i];
+        print(label + " | " + bar + " (" + str(data[i]) + ")");
+        i = i + 1;
+    }
+}
+
+fun main(_) {
+    var scores = [5, 12, 8, 15, 3, 10, 7];
+    histogram(scores);
+    return 0;
+}

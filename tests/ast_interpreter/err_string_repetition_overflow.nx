@@ -1,0 +1,5 @@
+fun main() {
+    // This should trigger overflow check: trying to allocate huge string
+    var str = "This is a reasonably long string that will overflow when multiplied";
+    print(str * 999999999999999999);
+}

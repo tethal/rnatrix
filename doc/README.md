@@ -12,8 +12,8 @@ practical compiler/interpreter construction.
 ## Learning Philosophy
 
 Start with high-level abstractions (AST interpreter) and gradually progress to low-level systems programming (`unsafe`,
-memory management, x64 code generation). Learn Rust features when they become necessary for the current implementation
-phase, not all at once.
+memory management, custom tracing GC, x64 code generation). Learn Rust features when they become necessary for the
+current implementation phase, not all at once.
 
 ## Project Progression
 
@@ -22,8 +22,8 @@ The project will evolve through several phases:
 1. **Tree-Walking Interpreter** - Direct AST evaluation, learn Rust basics
 2. **Bytecode VM** - Compilation to bytecode, stack-based VM
 3. **Type System** - Optional static type annotations, type checking
-4. **Native Code Generation** - x64 compilation for typed code
-5. **Advanced Types** - Generics, inference, sophisticated type features (stretch goal)
+4. **GC and/or Native Code Generation** - x64 compilation for typed code, tracing GC
+5. **Advanced Language Features** - Closures, iterators, generators, generics, ...
 
 See [[roadmap]] for detailed breakdown of each phase.
 
@@ -31,8 +31,7 @@ See [[roadmap]] for detailed breakdown of each phase.
 
 ### Gradually Typed System
 
-Starting with a dynamically typed language that will gain optional static type annotations later (similar to
-TypeScript's approach but simpler).
+Starting with a dynamically typed language that will gain optional static type annotations later.
 
 **Rationale:**
 
@@ -52,7 +51,7 @@ reference cycles.
 - Focus on getting interpreter working, not GC complexity
 - Simple and idiomatic Rust for shared ownership
 - Natural learning progression
-- Will upgrade to proper tracing GC later (Phase 4+)
+- Might upgrade to proper tracing GC later (Phase 4+)
 
 **Future GC considerations:**
 
@@ -141,7 +140,8 @@ impl Value {
 - **Accessor methods only** - All value creation and inspection goes through methods, never direct enum matching.
 - **Distinct int/float types** - Following Python's approach rather than JavaScript (where everything is a float).
   Requires numeric coercion rules in the evaluator.
-- **Heap values return pointers** - Methods like `as_string()` return `Rc<String>` (or `Gc<String>` later), not borrowed
+- **Heap values return pointers** - Methods like `unwrap_string()` return `Rc<String>` (or `Gc<String>` later), not
+  borrowed
   references. This allows values to outlive the original `Value` instance.
 - **Start simple** - Initial implementation uses standard Rust enum with `Rc<>` for heap values. Can be replaced with
   NaN-boxed representation later without changing user code.
@@ -159,8 +159,8 @@ impl Value {
 **String representation and operations:**
 
 - **Immutable heap strings**: `Rc<String>` for shared ownership
-- **UTF-8 storage**: Strings store UTF-8 bytes internally
-- **Byte-level operations**: `len()` returns byte count, indexing (when implemented) operates on bytes, not Unicode characters
+- **UTF-8 storage**: Strings are just sequences of bytes, assuming UTF-8
+- **Byte-level operations**: `len()` returns byte count, indexing operates on bytes, not Unicode codepoints
 - **Concatenation**: Only `string + string` works - no implicit conversion
 - **Comparison**: Supports all operators (`==`, `!=`, `<`, `<=`, `>`, `>=`) with lexicographic ordering
 
@@ -169,7 +169,7 @@ impl Value {
 - **Explicit conversions**: Following Python's approach - no implicit conversions
     - `"count: " + 42` → error (must use `"count: " + str(42)`)
     - `"42" + 1` → error (must use `int("42") + 1`)
-- **Builtins for conversion**: `str()`, `int()`, `float()`, `len()`
+- **Builtins for conversion**: `str()`, `int()`, `float()`
 
 **Equality special case:**
 

@@ -1,0 +1,3 @@
+<string>:4:17: error: list repetition result too large
+    print(large * 999999999999999999);
+                ^

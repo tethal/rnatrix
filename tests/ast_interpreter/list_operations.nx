@@ -1,0 +1,44 @@
+fun main() {
+    // List literals
+    print([]);
+    print([1]);
+    print([1, 2, 3]);
+    print([1, 2, 3, 4, 5]);
+
+    // List concatenation
+    print([1, 2] + [3, 4]);
+    print([] + [1, 2]);
+    print([1, 2] + []);
+    print([] + []);
+
+    // List repetition
+    print([1, 2] * 3);
+    print(3 * [1, 2]);
+    print([42] * 0);
+    print(0 * [42]);
+    print([] * 5);
+
+    // List equality
+    print([1, 2, 3] == [1, 2, 3]);
+    print([1, 2, 3] == [1, 2, 4]);
+    print([1, 2] == [1, 2, 3]);
+    print([] == []);
+    print([1, 2, 3] != [1, 2, 3]);
+    print([1, 2, 3] != [1, 2, 4]);
+
+    // Nested lists
+    print([[1, 2], [3, 4]]);
+    print([[1, 2], [3, 4]] == [[1, 2], [3, 4]]);
+    print([[1, 2], [3, 4]] == [[1, 2], [3, 5]]);
+
+    // Lists with strings
+    print(["a", "b", "c"]);
+    print(["hello", "world"] + ["!"]);
+
+    // len() on lists
+    print(len([]));
+    print(len([1, 2, 3]));
+    print(len([1, 2, 3, 4, 5]));
+
+    return 0;
+}

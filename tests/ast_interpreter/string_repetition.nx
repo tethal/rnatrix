@@ -1,0 +1,25 @@
+fun main() {
+    // Basic string repetition
+    print("abc" * 3);
+    print(3 * "abc");
+    print("x" * 5);
+    print("=" * 10);
+
+    // Edge cases
+    print("test" * 0);
+    print(0 * "test");
+    print("" * 5);
+    print("hello" * 1);
+
+    // String repetition with concatenation
+    print(("a" * 3) + ("b" * 2));
+    print("x" * 2 + "y" * 3);
+
+    // Variables
+    var str = "Hi";
+    var count = 4;
+    print(str * count);
+    print(count * str);
+
+    return 0;
+}

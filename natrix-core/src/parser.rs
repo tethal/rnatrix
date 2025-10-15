@@ -324,7 +324,7 @@ impl<'ctx> Parser<'ctx> {
         let op = match self.tt() {
             TokenType::Bang => UnaryOp::Not,
             TokenType::Minus => UnaryOp::Neg,
-            _ => return self.primary(),
+            _ => return self.postfix(),
         };
         let op_span = self.consume()?.span;
         let expr = self.unary()?;
@@ -337,6 +337,27 @@ impl<'ctx> Parser<'ctx> {
             },
             span,
         ))
+    }
+
+    fn postfix(&mut self) -> ParseResult<Expr> {
+        let mut expr = self.primary()?;
+        loop {
+            match self.tt() {
+                TokenType::LBracket => {
+                    self.consume()?;
+                    let index = self.expr()?;
+                    let span = expr.span.extend_to(self.expect(TokenType::RBracket)?.span);
+                    expr = Expr::new(
+                        ExprKind::ArrayAccess {
+                            array: Box::new(expr),
+                            index: Box::new(index),
+                        },
+                        span,
+                    );
+                }
+                _ => return Ok(expr),
+            }
+        }
     }
 
     fn primary(&mut self) -> ParseResult<Expr> {
@@ -364,6 +385,16 @@ impl<'ctx> Parser<'ctx> {
                 self.consume()?;
                 Ok(Expr::new(ExprKind::StringLiteral(value), span))
             }
+            TokenType::LBracket => {
+                let start_span = self.consume()?.span;
+                let values = if self.tt() == TokenType::RBracket {
+                    Vec::new()
+                } else {
+                    self.expr_list()?
+                };
+                let span = start_span.extend_to(self.expect(TokenType::RBracket)?.span);
+                Ok(Expr::new(ExprKind::ListLiteral(values), span))
+            }
             TokenType::LParen => {
                 let span = self.consume()?.span;
                 let e = self.expr()?;
@@ -375,14 +406,11 @@ impl<'ctx> Parser<'ctx> {
                 let name = self.consume()?.name.unwrap();
                 if self.tt() == TokenType::LParen {
                     self.consume()?;
-                    let mut args = vec![];
-                    if self.tt() != TokenType::RParen {
-                        args.push(self.expr()?);
-                        while self.tt() == TokenType::Comma {
-                            self.consume()?;
-                            args.push(self.expr()?);
-                        }
-                    }
+                    let args = if self.tt() == TokenType::RParen {
+                        Vec::new()
+                    } else {
+                        self.expr_list()?
+                    };
                     let span = name_span.extend_to(self.expect(TokenType::RParen)?.span);
                     Ok(Expr::new(
                         ExprKind::Call {
@@ -398,6 +426,16 @@ impl<'ctx> Parser<'ctx> {
             }
             tt => self.err(format!("expected expression, not {:?}", tt)),
         }
+    }
+
+    fn expr_list(&mut self) -> ParseResult<Vec<Expr>> {
+        let mut values = Vec::new();
+        values.push(self.expr()?);
+        while self.tt() == TokenType::Comma {
+            self.consume()?;
+            values.push(self.expr()?);
+        }
+        Ok(values)
     }
 
     fn expect(&mut self, tt: TokenType) -> NxResult<Token> {
@@ -439,7 +477,10 @@ impl<'ctx> Parser<'ctx> {
 }
 
 fn is_lvalue(expr: &Expr) -> bool {
-    matches!(expr.kind, ExprKind::Var(_))
+    matches!(
+        expr.kind,
+        ExprKind::Var(_) | ExprKind::ArrayAccess { array: _, index: _ }
+    )
 }
 
 /// Decodes a string literal by removing surrounding quotes and processing escape sequences.

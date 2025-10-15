@@ -1,0 +1,3 @@
+<string>:3:11: error: only lists and strings support indexing
+    print(x[0]);
+          ^^^^

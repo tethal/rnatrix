@@ -1,0 +1,3 @@
+<string>:3:5: error: only lists support indexing in assignments
+    str[0] = 72;  // Strings are immutable
+    ^^^^^^

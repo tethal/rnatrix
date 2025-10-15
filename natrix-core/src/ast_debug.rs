@@ -271,6 +271,11 @@ impl Debug for ExprDebug<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let span = self.expr.span;
         match &self.expr.kind {
+            ExprKind::ArrayAccess { array, index } => {
+                self.fmt.header(f, "ArrayAccess", span)?;
+                self.fmt.expr(f, array)?;
+                self.fmt.expr(f, index)
+            }
             ExprKind::Binary {
                 op,
                 op_span,
@@ -300,6 +305,13 @@ impl Debug for ExprDebug<'_> {
                 self.fmt.header_with_value(f, "FloatLiteral", span, value)
             }
             ExprKind::IntLiteral(value) => self.fmt.header_with_value(f, "IntLiteral", span, value),
+            ExprKind::ListLiteral(vec) => {
+                self.fmt.header(f, "ListLiteral", span)?;
+                for e in vec {
+                    self.fmt.expr(f, e)?;
+                }
+                Ok(())
+            }
             ExprKind::LogicalBinary {
                 and,
                 op_span,

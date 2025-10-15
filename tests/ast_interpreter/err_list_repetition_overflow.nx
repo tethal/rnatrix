@@ -1,0 +1,5 @@
+fun main() {
+    // This should trigger overflow check: trying to allocate huge list
+    var large = [1, 2] * 10;
+    print(large * 999999999999999999);
+}

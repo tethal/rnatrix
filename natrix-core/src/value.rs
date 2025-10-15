@@ -1,5 +1,6 @@
 use crate::error::{err_at, error_at, NxResult};
 use crate::src::Span;
+use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -11,6 +12,7 @@ pub enum ValueType {
     Int,
     Float,
     String,
+    List,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -23,6 +25,7 @@ enum ValueImpl {
     Int(i64),
     Float(f64),
     String(Rc<String>),
+    List(Rc<RefCell<Vec<Value>>>),
 }
 
 impl Value {
@@ -46,6 +49,10 @@ impl Value {
         Value(ValueImpl::String(v))
     }
 
+    pub fn from_list(v: Rc<RefCell<Vec<Value>>>) -> Self {
+        Value(ValueImpl::List(v))
+    }
+
     pub fn get_type(&self) -> ValueType {
         match self.0 {
             ValueImpl::Null => ValueType::Null,
@@ -53,6 +60,7 @@ impl Value {
             ValueImpl::Int(_) => ValueType::Int,
             ValueImpl::Float(_) => ValueType::Float,
             ValueImpl::String(_) => ValueType::String,
+            ValueImpl::List(_) => ValueType::List,
         }
     }
 
@@ -74,6 +82,10 @@ impl Value {
 
     pub fn is_string(&self) -> bool {
         matches!(self.0, ValueImpl::String(_))
+    }
+
+    pub fn is_list(&self) -> bool {
+        matches!(self.0, ValueImpl::List(_))
     }
 
     pub fn is_numeric(&self) -> bool {
@@ -105,6 +117,28 @@ impl Value {
         match &self.0 {
             ValueImpl::String(v) => v.clone(),
             _ => panic!("expected string, got {:?}", self.get_type()),
+        }
+    }
+
+    pub fn unwrap_list(&self) -> Rc<RefCell<Vec<Value>>> {
+        match &self.0 {
+            ValueImpl::List(v) => v.clone(),
+            _ => panic!("expected list, got {:?}", self.get_type()),
+        }
+    }
+
+    // Internal helpers - return reference to Rc (no refcount bump)
+    fn string_ref(&self) -> &Rc<String> {
+        match &self.0 {
+            ValueImpl::String(s) => s,
+            _ => panic!("expected string, got {:?}", self.get_type()),
+        }
+    }
+
+    fn list_ref(&self) -> &Rc<RefCell<Vec<Value>>> {
+        match &self.0 {
+            ValueImpl::List(v) => v,
+            _ => panic!("expected list, got {:?}", self.get_type()),
         }
     }
 
@@ -145,12 +179,23 @@ impl Value {
     // Arithmetic operators
 
     pub fn add(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+        // String concatenation
         if self.is_string() && other.is_string() {
             return Ok(Value::from_string(Rc::new(format!(
                 "{}{}",
-                self.unwrap_string(),
-                other.unwrap_string()
+                self.string_ref(),
+                other.string_ref()
             ))));
+        }
+
+        // List concatenation
+        if self.is_list() && other.is_list() {
+            let v1 = self.list_ref().borrow();
+            let v2 = other.list_ref().borrow();
+            let mut result = Vec::with_capacity(v1.len() + v2.len());
+            result.extend(v1.iter().cloned());
+            result.extend(v2.iter().cloned());
+            return Ok(Value::from_list(Rc::new(RefCell::new(result))));
         }
 
         self.check_numeric_operands(other, "+", op_span)?;
@@ -173,6 +218,58 @@ impl Value {
     }
 
     pub fn mul(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+        // String repetition
+        if self.is_string() && other.is_int() {
+            let s = self.string_ref();
+            let cnt = other.unwrap_int();
+            if cnt < 0 {
+                return err_at(op_span, "string repetition count cannot be negative");
+            }
+            let cnt = cnt as usize;
+
+            // Check for overflow before allocating
+            let new_len = s
+                .len()
+                .checked_mul(cnt)
+                .ok_or_else(|| error_at(op_span, "string repetition result too large"))?;
+
+            let mut result = String::with_capacity(new_len);
+            for _ in 0..cnt {
+                result.push_str(s);
+            }
+            return Ok(Value::from_string(Rc::new(result)));
+        }
+
+        if self.is_int() && other.is_string() {
+            return other.mul(self, op_span);
+        }
+
+        // List repetition
+        if self.is_list() && other.is_int() {
+            let l = self.list_ref().borrow();
+            let cnt = other.unwrap_int();
+            if cnt < 0 {
+                return err_at(op_span, "list repetition count cannot be negative");
+            }
+            let cnt = cnt as usize;
+
+            // Check for overflow before allocating
+            let new_len = l
+                .len()
+                .checked_mul(cnt)
+                .ok_or_else(|| error_at(op_span, "list repetition result too large"))?;
+
+            let mut result = Vec::with_capacity(new_len);
+            for _ in 0..cnt {
+                result.extend(l.iter().cloned());
+            }
+            return Ok(Value::from_list(Rc::new(RefCell::new(result))));
+        }
+
+        if self.is_int() && (other.is_string() || other.is_list()) {
+            return other.mul(self, op_span);
+        }
+
         self.check_numeric_operands(other, "*", op_span)?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
@@ -210,12 +307,27 @@ impl Value {
 
     // Comparison operators
 
-    pub fn eq(&self, other: &Value, _op_span: Span) -> NxResult<Value> {
+    pub fn eq(&self, other: &Value, op_span: Span) -> NxResult<Value> {
         // Strings
         if self.is_string() && other.is_string() {
-            return Ok(Value::from_bool(
-                self.unwrap_string() == other.unwrap_string(),
-            ));
+            return Ok(Value::from_bool(self.string_ref() == other.string_ref()));
+        }
+
+        // Lists - element-wise comparison
+        if let (ValueImpl::List(l1), ValueImpl::List(l2)) = (&self.0, &other.0) {
+            let v1 = l1.borrow();
+            let v2 = l2.borrow();
+
+            if v1.len() != v2.len() {
+                return Ok(Value::FALSE);
+            }
+
+            for (e1, e2) in v1.iter().zip(v2.iter()) {
+                if !e1.eq(e2, op_span)?.unwrap_bool() {
+                    return Ok(Value::FALSE);
+                }
+            }
+            return Ok(Value::TRUE);
         }
 
         // Bools
@@ -243,9 +355,7 @@ impl Value {
 
     pub fn lt(&self, other: &Value, op_span: Span) -> NxResult<Value> {
         if self.is_string() && other.is_string() {
-            return Ok(Value::from_bool(
-                self.unwrap_string() < other.unwrap_string(),
-            ));
+            return Ok(Value::from_bool(self.string_ref() < other.string_ref()));
         }
 
         self.check_numeric_operands(other, "<", op_span)?;
@@ -259,9 +369,7 @@ impl Value {
 
     pub fn le(&self, other: &Value, op_span: Span) -> NxResult<Value> {
         if self.is_string() && other.is_string() {
-            return Ok(Value::from_bool(
-                self.unwrap_string() <= other.unwrap_string(),
-            ));
+            return Ok(Value::from_bool(self.string_ref() <= other.string_ref()));
         }
 
         self.check_numeric_operands(other, "<=", op_span)?;
@@ -275,9 +383,7 @@ impl Value {
 
     pub fn gt(&self, other: &Value, op_span: Span) -> NxResult<Value> {
         if self.is_string() && other.is_string() {
-            return Ok(Value::from_bool(
-                self.unwrap_string() > other.unwrap_string(),
-            ));
+            return Ok(Value::from_bool(self.string_ref() > other.string_ref()));
         }
 
         self.check_numeric_operands(other, ">", op_span)?;
@@ -291,9 +397,7 @@ impl Value {
 
     pub fn ge(&self, other: &Value, op_span: Span) -> NxResult<Value> {
         if self.is_string() && other.is_string() {
-            return Ok(Value::from_bool(
-                self.unwrap_string() >= other.unwrap_string(),
-            ));
+            return Ok(Value::from_bool(self.string_ref() >= other.string_ref()));
         }
 
         self.check_numeric_operands(other, ">=", op_span)?;
@@ -340,11 +444,67 @@ impl Value {
     pub fn len(&self, span: Span) -> NxResult<Value> {
         match &self.0 {
             ValueImpl::String(s) => Ok(Value::from_int(s.len() as i64)),
+            ValueImpl::List(l) => Ok(Value::from_int(l.borrow().len() as i64)),
             _ => err_at(
                 span,
                 format!("len cannot be applied to {:?}", self.get_type()),
             ),
         }
+    }
+
+    pub fn get_item(&self, index: Value, span: Span) -> NxResult<Value> {
+        if !index.is_int() {
+            return err_at(span, "index must be an integer");
+        }
+
+        let idx = index.unwrap_int();
+        if idx < 0 {
+            return err_at(span, "index cannot be negative");
+        }
+        let idx = idx as usize;
+
+        if self.is_list() {
+            let list = self.list_ref().borrow();
+            return match list.get(idx) {
+                Some(v) => Ok(v.clone()),
+                None => err_at(span, "list index out of bounds"),
+            };
+        }
+
+        if self.is_string() {
+            let string = self.string_ref();
+            return match string.as_bytes().get(idx) {
+                Some(&byte) => Ok(Value::from_int(byte as i64)),
+                None => err_at(span, "string index out of bounds"),
+            };
+        }
+
+        err_at(span, "only lists and strings support indexing")
+    }
+
+    pub fn set_item(&self, index: Value, value: Value, span: Span) -> NxResult<()> {
+        if !index.is_int() {
+            return err_at(span, "index must be an integer");
+        }
+
+        let idx = index.unwrap_int();
+        if idx < 0 {
+            return err_at(span, "index cannot be negative");
+        }
+        let idx = idx as usize;
+
+        if self.is_list() {
+            let mut list = self.list_ref().borrow_mut();
+            return match list.get_mut(idx) {
+                Some(v) => {
+                    *v = value;
+                    Ok(())
+                }
+                None => err_at(span, "list index out of bounds"),
+            };
+        }
+
+        err_at(span, "only lists support indexing in assignments")
     }
 
     pub fn int(&self, span: Span) -> NxResult<Value> {
@@ -385,6 +545,19 @@ impl Display for Value {
             ValueImpl::Int(v) => write!(f, "{}", v),
             ValueImpl::Float(v) => write!(f, "{:?}", v),
             ValueImpl::String(v) => write!(f, "{}", v),
+            ValueImpl::List(v) => {
+                write!(f, "[")?;
+                for (i, e) in v.borrow().iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    match &e.0 {
+                        ValueImpl::String(s) => write!(f, "{:?}", s)?,
+                        _ => write!(f, "{}", e)?,
+                    }
+                }
+                write!(f, "]")
+            }
         }
     }
 }

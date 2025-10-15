@@ -1,0 +1,38 @@
+fun sieve(limit) {
+    // Create list of booleans [true, true, ...]
+    var is_prime = [true] * (limit + 1);
+    is_prime[0] = false;
+    is_prime[1] = false;
+
+    var i = 2;
+    while (i * i <= limit) {
+        if (is_prime[i]) {
+            // Mark multiples of i as composite
+            var j = i * i;
+            while (j <= limit) {
+                is_prime[j] = false;
+                j = j + i;
+            }
+        }
+        i = i + 1;
+    }
+
+    // Collect primes into result list
+    var primes = [];
+    i = 2;
+    while (i <= limit) {
+        if (is_prime[i]) {
+            primes = primes + [i];
+        }
+        i = i + 1;
+    }
+
+    return primes;
+}
+
+fun main(n) {
+    var primes = sieve(n);
+    print("Primes up to " + str(n) + ":");
+    print(primes);
+    return 0;
+}

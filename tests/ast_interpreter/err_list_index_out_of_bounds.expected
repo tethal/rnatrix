@@ -1,0 +1,3 @@
+<string>:3:11: error: list index out of bounds
+    print(list[5]);
+          ^^^^^^^

@@ -1,5 +1,8 @@
 use std::fmt::Debug;
+use std::fs;
+use std::io;
 use std::num::NonZeroUsize;
+use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceId(NonZeroUsize);
@@ -19,6 +22,16 @@ impl Sources {
         let source = Source::new(id, "<string>".to_owned(), content.to_owned());
         self.sources.push(source);
         id
+    }
+
+    pub fn add_from_file(&mut self, path: impl AsRef<Path>) -> io::Result<SourceId> {
+        let path = path.as_ref();
+        let content = fs::read_to_string(path)?;
+        let name = path.display().to_string();
+        let id = SourceId(NonZeroUsize::new(self.sources.len() + 1).unwrap());
+        let source = Source::new(id, name, content);
+        self.sources.push(source);
+        Ok(id)
     }
 
     pub fn get_by_id(&self, id: SourceId) -> &Source {

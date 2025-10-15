@@ -1,0 +1,4 @@
+fun main() {
+    var str = "hi";
+    print(str[10]);
+}

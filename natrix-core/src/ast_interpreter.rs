@@ -153,16 +153,27 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
     fn do_stmt(&mut self, env: &Rc<Env>, stmt: &Stmt) -> NxResult<StmtFlow> {
         match &stmt.kind {
             StmtKind::Assign { left, right } => {
-                let ExprKind::Var(name) = left.kind else {
-                    unreachable!();
-                };
-                let val = self.eval(env, right)?;
-                env.assign(name, val).map_err(|_| {
-                    error_at(
-                        left.span,
-                        format!("undeclared variable {:?}", self.ctx.interner.resolve(name)),
-                    )
-                })?;
+                match &left.kind {
+                    ExprKind::Var(name) => {
+                        let val = self.eval(env, right)?;
+                        env.assign(*name, val).map_err(|_| {
+                            error_at(
+                                left.span,
+                                format!(
+                                    "undeclared variable {:?}",
+                                    self.ctx.interner.resolve(*name)
+                                ),
+                            )
+                        })?;
+                    }
+                    ExprKind::ArrayAccess { array, index } => {
+                        let array = self.eval(env, &array)?;
+                        let index = self.eval(env, &index)?;
+                        let val = self.eval(env, right)?;
+                        array.set_item(index, val, left.span)?;
+                    }
+                    _ => unreachable!(),
+                }
                 Ok(StmtFlow::Next)
             }
             StmtKind::Block(stmts) => {
@@ -234,6 +245,11 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
 
     fn eval(&mut self, env: &Rc<Env>, expr: &Expr) -> NxResult<Value> {
         match &expr.kind {
+            ExprKind::ArrayAccess { array, index } => {
+                let array = self.eval(env, array)?;
+                let index = self.eval(env, index)?;
+                array.get_item(index, expr.span)
+            }
             ExprKind::Binary {
                 op,
                 op_span,
@@ -311,6 +327,13 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
             }
             ExprKind::FloatLiteral(value) => Ok(Value::from_float(*value)),
             ExprKind::IntLiteral(value) => Ok(Value::from_int(*value)),
+            ExprKind::ListLiteral(exprs) => {
+                let mut values = Vec::with_capacity(exprs.len());
+                for expr in exprs {
+                    values.push(self.eval(env, expr)?);
+                }
+                Ok(Value::from_list(Rc::new(RefCell::new(values))))
+            }
             ExprKind::LogicalBinary {
                 and,
                 op_span: _,

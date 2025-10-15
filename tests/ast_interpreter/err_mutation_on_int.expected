@@ -1,0 +1,3 @@
+<string>:3:5: error: only lists support indexing in assignments
+    x[0] = 1;
+    ^^^^

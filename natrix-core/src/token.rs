@@ -62,6 +62,8 @@ impl<'ctx> Tokenizer<'ctx> {
             Some(c) if c.is_ascii_alphabetic() || c == '_' => self.do_identifier(),
             Some('(') => Ok(TokenType::LParen),
             Some(')') => Ok(TokenType::RParen),
+            Some('[') => Ok(TokenType::LBracket),
+            Some(']') => Ok(TokenType::RBracket),
             Some('{') => Ok(TokenType::LBrace),
             Some('}') => Ok(TokenType::RBrace),
             Some('+') => Ok(TokenType::Plus),
@@ -182,8 +184,7 @@ impl<'ctx> Tokenizer<'ctx> {
                 Some('\\') => {
                     self.cursor.advance(); // Consume backslash
                     match self.cursor.peek() {
-                        Some('"') | Some('\\') | Some('n') | Some('t') | Some('r')
-                        | Some('0') => {
+                        Some('"') | Some('\\') | Some('n') | Some('t') | Some('r') | Some('0') => {
                             self.cursor.advance(); // Consume escape char
                         }
                         Some(c) => {

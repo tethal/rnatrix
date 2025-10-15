@@ -45,6 +45,10 @@ ast_node!(Expr {
 });
 
 pub enum ExprKind {
+    ArrayAccess {
+        array: Box<Expr>,
+        index: Box<Expr>,
+    },
     Binary {
         op: BinaryOp,
         op_span: Span,
@@ -59,6 +63,7 @@ pub enum ExprKind {
     },
     FloatLiteral(f64),
     IntLiteral(i64),
+    ListLiteral(Vec<Expr>),
     LogicalBinary {
         and: bool,
         op_span: Span,

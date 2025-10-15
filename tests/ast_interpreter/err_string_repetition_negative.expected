@@ -1,0 +1,3 @@
+<string>:2:19: error: string repetition count cannot be negative
+    print("hello" * -3);
+                  ^

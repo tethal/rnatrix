@@ -23,9 +23,9 @@ See [[README]] for project overview and design decisions.
 - [X] **Refactor operators** - Move from ast_interpreter to value.
 - [X] **Builtin functions** - Refactor print statement to builtin function (called via `Call` mechanism).
 - [X] **Strings** - Heap-allocated strings (`Rc<String>`), literals, concatenation, comparison.
-- [ ] **Lists** - Fixed-size lists (`Rc<RefCell<Vec<Value>>>`), literals, indexing, mutation via `list[i] = value`.
-- [ ] **Indexing for strings** - with bounds checking
-- [ ] **len() builtin** - Returns length of strings and lists as integer.
+- [X] **Lists** - Fixed-size lists (`Rc<RefCell<Vec<Value>>>`), literals, indexing, mutation via `list[i] = value`.
+- [X] **Indexing for strings** - with bounds checking
+- [X] **len() builtin** - Returns length of strings and lists as integer.
 
 ### Rust Learning Focus
 
@@ -93,7 +93,7 @@ Upgrade to `Rc<RefCell<>>` with better reference management
 
 - [ ] Primitive types: `int`, `float`, `bool`, `string`
 - [ ] Function types: `fn(T1, T2) -> R`
-- [ ] Simple collection types: `array<T>`
+- [ ] Simple collection types: `list<T>`
 
 ### Rust Learning Focus
 
@@ -179,26 +179,6 @@ Keep it simple - no generics, no variance, no structural subtyping yet. Start wi
 ### Note
 
 This phase is genuinely hard PL theory. Consider it a stretch goal.
-
----
-
-## Milestones
-
-### Milestone 1: "Hello, World"
-
-Can run basic programs with functions and variables
-
-### Milestone 2: "Fibonacci"
-
-Can compute recursive functions efficiently via bytecode
-
-### Milestone 3: "Typed Fibonacci"
-
-Can type-check and optimize statically-typed recursive functions
-
-### Milestone 4: "Native Fibonacci"
-
-Can compile to x64 and run at native speed
 
 ---
 

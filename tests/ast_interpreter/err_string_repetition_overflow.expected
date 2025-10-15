@@ -1,0 +1,3 @@
+<string>:4:15: error: string repetition result too large
+    print(str * 999999999999999999);
+              ^

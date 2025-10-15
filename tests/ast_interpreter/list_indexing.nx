@@ -1,0 +1,33 @@
+fun main() {
+    var list = [10, 20, 30, 40, 50];
+
+    // Basic indexing
+    print(list[0]);
+    print(list[1]);
+    print(list[2]);
+    print(list[3]);
+    print(list[4]);
+
+    // Indexing with expressions
+    print(list[1 + 1]);
+    print(list[5 - 1]);
+
+    // Nested list indexing
+    var nested = [[1, 2], [3, 4], [5, 6]];
+    print(nested[0]);
+    print(nested[1]);
+    print(nested[0][0]);
+    print(nested[0][1]);
+    print(nested[1][0]);
+    print(nested[2][1]);
+
+    // Indexing result of concatenation
+    print(([1, 2] + [3, 4])[0]);
+    print(([1, 2] + [3, 4])[3]);
+
+    // Indexing result of repetition
+    print(([5, 6] * 3)[0]);
+    print(([5, 6] * 3)[5]);
+
+    return 0;
+}

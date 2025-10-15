@@ -1,0 +1,4 @@
+fun main() {
+    var str = "hello";
+    str[0] = 72;  // Strings are immutable
+}

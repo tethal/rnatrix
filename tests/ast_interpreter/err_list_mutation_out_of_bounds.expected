@@ -1,0 +1,3 @@
+<string>:3:5: error: list index out of bounds
+    list[10] = 99;
+    ^^^^^^^^

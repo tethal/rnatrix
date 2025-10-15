@@ -1,0 +1,66 @@
+fun main() {
+    // Basic mutation
+    var list = [1, 2, 3];
+    list[0] = 10;
+    print(list);
+
+    list[1] = 20;
+    print(list);
+
+    list[2] = 30;
+    print(list);
+
+    // Mutation with expressions
+    var nums = [5, 10, 15];
+    nums[1] = nums[1] * 2;
+    print(nums);
+
+    nums[0] = nums[2] - nums[0];
+    print(nums);
+
+    // Mutation with different types
+    var mixed = [1, 2, 3];
+    mixed[0] = "string";
+    print(mixed);
+
+    mixed[1] = [4, 5];
+    print(mixed);
+
+    // Mutation in nested lists
+    var nested = [[1, 2], [3, 4]];
+    nested[0][1] = 99;
+    print(nested);
+
+    nested[1] = [7, 8, 9];
+    print(nested);
+
+    // Mutation with computed index
+    var data = [10, 20, 30, 40];
+    var idx = 2;
+    data[idx] = 300;
+    print(data);
+
+    data[idx - 1] = 200;
+    print(data);
+
+    // Self-referential mutation
+    var vals = [1, 2, 3, 4, 5];
+    vals[2] = vals[2] + vals[0] + vals[4];
+    print(vals);
+
+    // Variables share the same list (reference semantics)
+    var original = [1, 2, 3];
+    var copy = original;  // Both reference same list
+    copy[1] = 99;
+    print(original);  // Will show [1, 99, 3] - mutation visible!
+    print(copy);
+
+    // Mutation after concatenation creates new list
+    var a = [1, 2];
+    var b = a + [3, 4];
+    b[0] = 99;
+    print(a);  // Should still be [1, 2]
+    print(b);  // Should be [99, 2, 3, 4]
+
+    return 0;
+}

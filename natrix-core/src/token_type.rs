@@ -20,6 +20,8 @@ pub enum TokenType {
     StringLiteral,
     LParen,
     RParen,
+    LBracket,
+    RBracket,
     LBrace,
     RBrace,
     Plus,
