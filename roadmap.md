@@ -49,32 +49,112 @@ See [[README]] for project overview and design decisions.
 
 **Goal:** Compile to bytecode and execute on a stack-based virtual machine
 
-### New Features
+### Implementation Steps
 
-- [ ] Bytecode instruction set design
-- [ ] Compiler (AST → bytecode)
-- [ ] Stack-based VM
-- [ ] Better performance than tree-walking
+1. **Design bytecode format**
+   - [ ] Opcodes and operand encoding (variable-width instructions)
+   - [ ] Instruction set design (stack-based)
+   - [ ] Define `Bytecode` structure: `{ code: Vec<u8>, constants: Vec<Value> }`
+   - [ ] Document bytecode format and calling convention
+
+2. **Build disassembler**
+   - [ ] Parse flat byte array into human-readable instructions
+   - [ ] Pretty-print with constant pool references
+   - [ ] Test with handwritten bytecode
+
+3. **VM core (expressions only)**
+   - [ ] Stack machine implementation
+   - [ ] Instruction dispatch loop
+   - [ ] Arithmetic and logic operations
+   - [ ] Constant loading from pool
+   - [ ] API: `fn execute(&self, entry_offset: usize, args: &[Value]) -> Result<Value>`
+
+4. **Compiler IR design**
+   - [ ] High-level instruction representation (not yet encoded to bytes)
+   - [ ] Label-based addressing (labels resolve to offsets later)
+   - [ ] Easy to generate from AST
+
+5. **Assembler (IR → Bytecode)**
+   - [ ] Resolve labels to byte offsets
+   - [ ] Encode instructions to `Vec<u8>`
+   - [ ] Build constant pool (`Vec<Value>`)
+   - [ ] Variable-width instruction encoding
+
+6. **Compiler (expressions)**
+   - [ ] AST → IR for arithmetic/logic expressions
+   - [ ] Generate stack-based code
+   - [ ] Test against Phase 1 evaluator for correctness
+
+7. **Extend: variables & functions**
+   - [ ] Local variables (stack slots)
+   - [ ] Function calls (jumps to offsets in flat bytecode)
+   - [ ] Return values
+   - [ ] Function arguments via stack
+
+8. **Extend: control flow**
+   - [ ] If/else (conditional jumps)
+   - [ ] While loops (unconditional jumps)
+   - [ ] Break/continue (jumps to labels)
+
+9. **Extend: strings**
+   - [ ] String constants in constant pool
+   - [ ] String concatenation and comparison operations
+
+10. **Extend: lists**
+    - [ ] Heap allocation from VM
+    - [ ] List indexing and mutation
+    - [ ] List literals
+
+11. *(Optional)* **Bytecode serialization**
+    - [ ] Serialize `Bytecode` to file format
+    - [ ] Deserialize and load for standalone execution
+    - [ ] Handle constant pool serialization (Value encoding)
 
 ### Rust Learning Focus
 
+- Byte-level data encoding and decoding
 - Vectors as stacks
-- Instruction encoding
-- First `unsafe` code for performance
-- More sophisticated enum usage
-- Debugging bytecode execution
+- Variable-width instruction encoding
+- First `unsafe` code for performance (optional - instruction dispatch)
+- Understanding memory layout and alignment
+- Debugging low-level execution
+
+### Design Decisions
+
+**Flat bytecode layout:**
+- VM always operates on flat `Vec<u8>` from day one
+- Entry point is byte offset, not function object lookup
+- Functions are just labeled offsets in the bytecode
+- Execution starts at offset 0 by convention for single-file scripts
+
+**In-memory execution only (Phase 2 scope):**
+- Compiler and VM live in same process
+- Constant pool is high-level `Vec<Value>` (with `Rc`, `RefCell`)
+- No serialization initially - focus on execution model
+- Serialization is optional busywork (step 11 or deferred)
+
+**Bytecode structure:**
+```rust
+struct Bytecode {
+    code: Vec<u8>,          // flat bytecode stream
+    constants: Vec<Value>,  // constant pool (high-level values)
+}
+```
+
+Instructions reference constants by index (1 or 2 bytes depending on pool size).
 
 ### Deliverables
 
-- Bytecode instruction definitions
-- Bytecode compiler
-- VM with stack and instruction pointer
+- Bytecode instruction definitions and documentation
 - Disassembler for debugging
+- VM with stack and instruction pointer
+- Bytecode compiler (AST → Bytecode)
 - Performance comparison with Phase 1
+- Test suite demonstrating correctness
 
-### GC Strategy
+### Memory Management Strategy
 
-Upgrade to `Rc<RefCell<>>` with better reference management
+Continue with `Rc<RefCell<>>` for runtime values. No changes to GC strategy in Phase 2.
 
 ---
 
