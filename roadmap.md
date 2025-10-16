@@ -52,60 +52,65 @@ See [[README]] for project overview and design decisions.
 ### Implementation Steps
 
 1. **Design bytecode format**
-   - [ ] Opcodes and operand encoding (variable-width instructions)
-   - [ ] Instruction set design (stack-based)
-   - [ ] Define `Bytecode` structure: `{ code: Vec<u8>, constants: Vec<Value> }`
-   - [ ] Document bytecode format and calling convention
+    - [X] Opcodes and operand encoding (variable-width instructions)
+    - [X] Instruction set design (stack-based)
+    - [ ] Define `Bytecode` structure: `{ code: Vec<u8>, constants: Vec<Value> }`
+    - [X] Document bytecode format and calling convention
 
-2. **Build disassembler**
-   - [ ] Parse flat byte array into human-readable instructions
-   - [ ] Pretty-print with constant pool references
-   - [ ] Test with handwritten bytecode
+2. **Build assembler**
+    - [ ] Instruction parsing
+    - [ ] Label resolution
+    - [ ] Constant pool building
 
-3. **VM core (expressions only)**
-   - [ ] Stack machine implementation
-   - [ ] Instruction dispatch loop
-   - [ ] Arithmetic and logic operations
-   - [ ] Constant loading from pool
-   - [ ] API: `fn execute(&self, entry_offset: usize, args: &[Value]) -> Result<Value>`
+3. **Build disassembler**
+    - [ ] Parse flat byte array into human-readable instructions
+    - [ ] Pretty-print with constant pool references
+    - [ ] Test with handwritten bytecode
 
-4. **Compiler IR design**
-   - [ ] High-level instruction representation (not yet encoded to bytes)
-   - [ ] Label-based addressing (labels resolve to offsets later)
-   - [ ] Easy to generate from AST
+4. **VM core (expressions only)**
+    - [ ] Stack machine implementation
+    - [ ] Instruction dispatch loop
+    - [ ] Arithmetic and logic operations
+    - [ ] Constant loading from pool
+    - [ ] API: `fn execute(&self, entry_offset: usize, args: &[Value]) -> Result<Value>`
 
-5. **Assembler (IR → Bytecode)**
-   - [ ] Resolve labels to byte offsets
-   - [ ] Encode instructions to `Vec<u8>`
-   - [ ] Build constant pool (`Vec<Value>`)
-   - [ ] Variable-width instruction encoding
+5. **Compiler IR design**
+    - [ ] High-level instruction representation (not yet encoded to bytes)
+    - [ ] Label-based addressing (labels resolve to offsets later)
+    - [ ] Easy to generate from AST
 
-6. **Compiler (expressions)**
-   - [ ] AST → IR for arithmetic/logic expressions
-   - [ ] Generate stack-based code
-   - [ ] Test against Phase 1 evaluator for correctness
+6. **Assembler (IR → Bytecode)**
+    - [ ] Resolve labels to byte offsets
+    - [ ] Encode instructions to `Vec<u8>`
+    - [ ] Build constant pool (`Vec<Value>`)
+    - [ ] Variable-width instruction encoding
 
-7. **Extend: variables & functions**
-   - [ ] Local variables (stack slots)
-   - [ ] Function calls (jumps to offsets in flat bytecode)
-   - [ ] Return values
-   - [ ] Function arguments via stack
+7. **Compiler (expressions)**
+    - [ ] AST → IR for arithmetic/logic expressions
+    - [ ] Generate stack-based code
+    - [ ] Test against Phase 1 evaluator for correctness
 
-8. **Extend: control flow**
-   - [ ] If/else (conditional jumps)
-   - [ ] While loops (unconditional jumps)
-   - [ ] Break/continue (jumps to labels)
+8. **Extend: variables & functions**
+    - [ ] Local variables (stack slots)
+    - [ ] Function calls (jumps to offsets in flat bytecode)
+    - [ ] Return values
+    - [ ] Function arguments via stack
 
-9. **Extend: strings**
-   - [ ] String constants in constant pool
-   - [ ] String concatenation and comparison operations
+9. **Extend: control flow**
+    - [ ] If/else (conditional jumps)
+    - [ ] While loops (unconditional jumps)
+    - [ ] Break/continue (jumps to labels)
 
-10. **Extend: lists**
+10. **Extend: strings**
+    - [ ] String constants in constant pool
+    - [ ] String concatenation and comparison operations
+
+11. **Extend: lists**
     - [ ] Heap allocation from VM
     - [ ] List indexing and mutation
     - [ ] List literals
 
-11. *(Optional)* **Bytecode serialization**
+12. *(Optional)* **Bytecode serialization**
     - [ ] Serialize `Bytecode` to file format
     - [ ] Deserialize and load for standalone execution
     - [ ] Handle constant pool serialization (Value encoding)
@@ -122,18 +127,21 @@ See [[README]] for project overview and design decisions.
 ### Design Decisions
 
 **Flat bytecode layout:**
+
 - VM always operates on flat `Vec<u8>` from day one
 - Entry point is byte offset, not function object lookup
 - Functions are just labeled offsets in the bytecode
 - Execution starts at offset 0 by convention for single-file scripts
 
 **In-memory execution only (Phase 2 scope):**
+
 - Compiler and VM live in same process
 - Constant pool is high-level `Vec<Value>` (with `Rc`, `RefCell`)
 - No serialization initially - focus on execution model
 - Serialization is optional busywork (step 11 or deferred)
 
 **Bytecode structure:**
+
 ```rust
 struct Bytecode {
     code: Vec<u8>,          // flat bytecode stream
