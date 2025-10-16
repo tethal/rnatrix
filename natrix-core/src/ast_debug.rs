@@ -290,12 +290,9 @@ impl Debug for ExprDebug<'_> {
             ExprKind::BoolLiteral(value) => {
                 self.fmt.header_with_value(f, "BoolLiteral", span, value)
             }
-            ExprKind::Call {
-                name,
-                name_span,
-                args,
-            } => {
-                self.fmt.header_with_name(f, "Call", *name_span, *name)?;
+            ExprKind::Call { callee, args } => {
+                self.fmt.header(f, "Call", span)?;
+                self.fmt.expr(f, callee)?;
                 for a in args {
                     self.fmt.expr(f, a)?;
                 }

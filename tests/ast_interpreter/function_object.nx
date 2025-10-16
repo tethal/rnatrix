@@ -1,0 +1,17 @@
+fun f(a) {
+    return a + 1;
+}
+
+fun a() {
+    return f;
+}
+
+fun b(x, y) {
+    return x(y);
+}
+
+fun main() {
+    var x = a();
+    print(b(x, 42));
+    print(str);
+}

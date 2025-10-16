@@ -57,8 +57,7 @@ pub enum ExprKind {
     },
     BoolLiteral(bool),
     Call {
-        name: Name,
-        name_span: Span,
+        callee: Box<Expr>,
         args: Vec<Expr>,
     },
     FloatLiteral(f64),
@@ -72,7 +71,7 @@ pub enum ExprKind {
     },
     NullLiteral,
     Paren(Box<Expr>),
-    StringLiteral(Rc<String>),
+    StringLiteral(Rc<str>),
     Unary {
         op: UnaryOp,
         op_span: Span,

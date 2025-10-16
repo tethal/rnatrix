@@ -1,4 +1,4 @@
 2
-<string>:3:11: error: len expects 1 argument
+<string>:3:11: error: function len expects 1 argument, but 0 were provided
     print(len());
-          ^^^
+          ^^^^^

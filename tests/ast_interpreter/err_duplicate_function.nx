@@ -1,4 +1,5 @@
 fun main() {
-    4 + 5 )
 }
 
+fun main(a) {
+}

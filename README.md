@@ -117,6 +117,16 @@ enum Expr {
 - Matches production compiler patterns (rustc uses similar approach)
 - Easy to evolve - can add arena allocation or custom smart pointers later
 
+### AST Interpreter as Compiler Component
+
+The AST interpreter (Phase 1) is architecturally part of the compiler toolchain, not a standalone runtime:
+
+- Uses compile-time structures: interned `Name` identifiers, `Span` for errors, direct AST access
+- Has mutable access to `CompilerContext` (can intern new strings, access sources for error reporting)
+- Serves as reference implementation and testing tool during development
+
+This contrasts with the bytecode VM (Phase 2+), which will be a standalone runtime with no dependencies on compiler infrastructure (uses string constant pool, line number tables, no interning).
+
 ### Runtime Value Representation
 
 **Opaque `Value` type with accessor methods:**
@@ -190,6 +200,36 @@ impl Value {
 - Explicit conversions prevent bugs and make intent clear
 - Lenient equality enables flexible comparisons without verbosity
 - Documented cast behavior avoids surprises with edge cases (NaN, infinity, overflow)
+
+### Identifier Interning
+
+**All identifiers use interned strings:**
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Name(NonZeroU32);  // Index into global string interner
+
+struct Interner {
+    strings: Vec<Box<str>>,
+    map: HashMap<Box<str>, Name>,
+}
+```
+
+**Design decisions:**
+
+- **Global interner** - All identifiers (variable names, function names, field names) are interned during parsing
+- **Cheap comparison** - `Name` equality is just integer comparison
+- **Cheap copying** - `Name` is `Copy`, no refcounting overhead
+- **Memory efficient** - Each unique identifier stored once, regardless of usage frequency
+- **Debugging consideration** - `Name` displays as a number; requires interner access to get original string
+
+**Rationale:**
+
+- Common compiler pattern (used by rustc, most production compilers)
+- Identifiers appear repeatedly throughout AST and runtime (function names in call sites, variable names in scopes)
+- Integer comparison and hashing faster than string operations
+- Enables efficient symbol tables and scope management
+- Works naturally with Rust's `Copy` types
 
 ### Source Representation and Spans
 

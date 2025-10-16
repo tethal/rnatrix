@@ -25,5 +25,10 @@ fun main() {
     print(42.0 == 42);
     print(3.14 != 2.71);
 
+    // Functions
+    print(str == str);
+    print(str == print);
+    print(str == 42);
+
     return 0;
 }

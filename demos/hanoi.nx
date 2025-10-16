@@ -1,7 +1,7 @@
 fun hanoi(n, src_peg, dst_peg, tmp_peg) {
     if (n == 0) return 0;
     var moves = hanoi(n - 1, src_peg, tmp_peg, dst_peg);
-    // print("Move disc from peg " + src_peg + " to peg " + dst_peg);
+    print("Move disc from peg " + src_peg + " to peg " + dst_peg);
     moves = moves + hanoi(n - 1, tmp_peg, dst_peg, src_peg);
     return moves + 1;
 }

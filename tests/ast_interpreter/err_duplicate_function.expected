@@ -1,0 +1,3 @@
+<string>:4:5: error: function main already defined
+fun main(a) {
+    ^^^^

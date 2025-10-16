@@ -2,10 +2,14 @@ use crate::ast::{BinaryOp, Expr, ExprKind, FunDecl, Program, Stmt, StmtKind, Una
 use crate::ctx::{CompilerContext, Name};
 use crate::error::{err, err_at, error_at, NxResult};
 use crate::src::Span;
-use crate::value::{Value, ValueType};
+use crate::value::{
+    CodeHandle, FunctionObject, Value, ValueType, BUILTIN_FLOAT, BUILTIN_INT,
+    BUILTIN_LEN, BUILTIN_PRINT, BUILTIN_STR,
+};
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::convert::Into;
 use std::io;
 use std::io::Write;
 use std::rc::Rc;
@@ -13,15 +17,18 @@ use std::rc::Rc;
 pub struct Interpreter<'ctx, W: Write = io::Stdout> {
     ctx: &'ctx CompilerContext,
     output: W,
-    functions: HashMap<Name, Rc<FunDecl>>,
+    globals: Rc<Env>,
+    fun_decls: Vec<Rc<FunDecl>>,
 }
 
 impl<'ctx> Interpreter<'ctx, io::Stdout> {
-    pub fn new(ctx: &'ctx CompilerContext) -> Self {
+    pub fn new(ctx: &'ctx mut CompilerContext) -> Self {
+        let globals = Env::new_root(ctx);
         Self {
             ctx,
             output: io::stdout(),
-            functions: HashMap::new(),
+            globals,
+            fun_decls: Vec::new(),
         }
     }
 }
@@ -40,11 +47,17 @@ struct Env {
 }
 
 impl Env {
-    fn new_root() -> Rc<Env> {
-        Rc::new(Env {
+    fn new_root(ctx: &mut CompilerContext) -> Rc<Env> {
+        let env = Rc::new(Env {
             vars: RefCell::new(HashMap::new()),
             parent: None,
-        })
+        });
+        env.define_builtin(ctx, "print", 1, BUILTIN_PRINT);
+        env.define_builtin(ctx, "len", 1, BUILTIN_LEN);
+        env.define_builtin(ctx, "str", 1, BUILTIN_STR);
+        env.define_builtin(ctx, "int", 1, BUILTIN_INT);
+        env.define_builtin(ctx, "float", 1, BUILTIN_FLOAT);
+        env
     }
 
     fn new(parent: &Rc<Env>) -> Rc<Env> {
@@ -52,6 +65,24 @@ impl Env {
             vars: RefCell::new(HashMap::new()),
             parent: Some(parent.clone()),
         })
+    }
+
+    fn define_builtin(
+        &self,
+        ctx: &mut CompilerContext,
+        name: &str,
+        arity: usize,
+        code_handle: CodeHandle,
+    ) {
+        self.declare(
+            ctx.interner.intern(name),
+            Value::from_function(Rc::new(FunctionObject {
+                name: name.into(),
+                arity,
+                code_handle,
+            })),
+        )
+        .expect("duplicate built-in function");
     }
 
     fn lookup(&self, name: &Name) -> Option<Value> {
@@ -83,11 +114,13 @@ impl Env {
 }
 
 impl<'ctx, W: Write> Interpreter<'ctx, W> {
-    pub fn with_output(ctx: &'ctx CompilerContext, output: W) -> Self {
+    pub fn with_output(ctx: &'ctx mut CompilerContext, output: W) -> Self {
+        let globals = Env::new_root(ctx);
         Self {
             ctx,
             output,
-            functions: HashMap::new(),
+            globals,
+            fun_decls: Vec::new(),
         }
     }
 
@@ -97,40 +130,71 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
             .map_err(|e| error_at(span, e.to_string()))
     }
 
-    fn find_fun_decl(&self, name: Name) -> Option<Rc<FunDecl>> {
-        self.functions.get(&name).cloned()
-    }
-
     pub fn run(&mut self, program: Program, args: Vec<Value>) -> NxResult<Value> {
         let main_name = self.ctx.interner.lookup("main");
+        let mut main_fun: Option<(Value, Span)> = None;
         for decl in program.decls {
-            self.functions.insert(decl.name, Rc::new(decl));
+            let decl = Rc::new(decl);
+            let index = self.fun_decls.len();
+            self.fun_decls.push(decl.clone());
+            let fun_obj = Value::from_function(Rc::new(FunctionObject {
+                name: self.ctx.interner.resolve(decl.name).into(),
+                arity: decl.params.len(),
+                code_handle: CodeHandle(index),
+            }));
+            if main_name == Some(decl.name) {
+                main_fun = Some((fun_obj.clone(), decl.name_span));
+            }
+            self.globals.declare(decl.name, fun_obj).map_err(|_| {
+                error_at(
+                    decl.name_span,
+                    format!(
+                        "function {} already defined",
+                        self.ctx.interner.resolve(decl.name)
+                    ),
+                )
+            })?;
         }
-        let fun_decl_opt = main_name.and_then(|name| self.find_fun_decl(name));
-        match fun_decl_opt {
-            Some(fun_decl) => self.invoke(None, fun_decl, args),
+        match main_fun {
+            Some((fun_decl, span)) => self.dispatch(span, fun_decl, args),
             None => err("no main function defined"),
         }
     }
 
-    pub fn invoke(
-        &mut self,
-        call_site_span: Option<Span>,
-        fun_decl: Rc<FunDecl>,
-        args: Vec<Value>,
-    ) -> NxResult<Value> {
-        if args.len() != fun_decl.params.len() {
+    fn dispatch(&mut self, span: Span, callee: Value, args: Vec<Value>) -> NxResult<Value> {
+        if !callee.is_function() {
+            return err_at(span, format!("not a function: {}", callee));
+        }
+        let fun_obj = callee.unwrap_function();
+
+        if args.len() != fun_obj.arity {
             return err_at(
-                call_site_span.unwrap_or(fun_decl.name_span),
+                span,
                 format!(
-                    "function expects {} argument{}, but {} were provided",
-                    fun_decl.params.len(),
-                    if fun_decl.params.len() == 1 { "" } else { "s" },
+                    "function {} expects {} argument{}, but {} were provided",
+                    fun_obj.name,
+                    fun_obj.arity,
+                    if fun_obj.arity == 1 { "" } else { "s" },
                     args.len()
                 ),
             );
         }
-        let env = Env::new_root();
+
+        match fun_obj.code_handle {
+            BUILTIN_FLOAT => args[0].float(span),
+            BUILTIN_INT => args[0].int(span),
+            BUILTIN_LEN => args[0].len(span),
+            BUILTIN_PRINT => {
+                self.print(span, &args[0])?;
+                Ok(Value::NULL)
+            }
+            BUILTIN_STR => Ok(args[0].str()),
+            CodeHandle(index) => self.invoke(self.fun_decls.get(index).unwrap().clone(), args),
+        }
+    }
+
+    fn invoke(&mut self, fun_decl: Rc<FunDecl>, args: Vec<Value>) -> NxResult<Value> {
+        let env = Env::new(&self.globals);
         for (param, arg) in fun_decl.params.iter().zip(args) {
             env.declare(param.name, arg).map_err(|_| {
                 error_at(
@@ -273,57 +337,13 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                 }
             }
             ExprKind::BoolLiteral(value) => Ok(Value::from_bool(*value)),
-            ExprKind::Call {
-                name,
-                name_span,
-                args,
-            } => {
+            ExprKind::Call { callee, args } => {
+                let callee = self.eval(env, callee)?;
                 let mut arg_values = Vec::with_capacity(args.len());
                 for arg in args {
                     arg_values.push(self.eval(env, arg)?);
                 }
-                match self.find_fun_decl(*name) {
-                    Some(fun_decl) => self.invoke(Some(*name_span), fun_decl, arg_values),
-                    None => match self.ctx.interner.resolve(*name) {
-                        // TODO: Replace string matching with Name-based builtin lookup or registry
-                        "float" => {
-                            if args.len() != 1 {
-                                return err_at(*name_span, "float expects 1 argument");
-                            }
-                            self.eval(env, &args[0])?.float(expr.span)
-                        }
-                        "int" => {
-                            if args.len() != 1 {
-                                return err_at(*name_span, "int expects 1 argument");
-                            }
-                            self.eval(env, &args[0])?.int(expr.span)
-                        }
-                        "len" => {
-                            if args.len() != 1 {
-                                return err_at(*name_span, "len expects 1 argument");
-                            }
-                            self.eval(env, &args[0])?.len(expr.span)
-                        }
-                        "print" => {
-                            if args.len() != 1 {
-                                return err_at(*name_span, "print expects 1 argument");
-                            }
-                            let val = self.eval(env, &args[0])?;
-                            self.print(*name_span, &val)?;
-                            Ok(Value::NULL)
-                        }
-                        "str" => {
-                            if args.len() != 1 {
-                                return err_at(*name_span, "str expects 1 argument");
-                            }
-                            Ok(self.eval(env, &args[0])?.str())
-                        }
-                        _ => err_at(
-                            *name_span,
-                            format!("undeclared function {:?}", self.ctx.interner.resolve(*name)),
-                        ),
-                    },
-                }
+                self.dispatch(expr.span, callee, arg_values)
             }
             ExprKind::FloatLiteral(value) => Ok(Value::from_float(*value)),
             ExprKind::IntLiteral(value) => Ok(Value::from_int(*value)),

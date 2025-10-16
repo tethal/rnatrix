@@ -1,6 +1,6 @@
 42
 4
 4
-<string>:5:11: error: int expects 1 argument
+<string>:5:11: error: function int expects 1 argument, but 0 were provided
     print(int());
-          ^^^
+          ^^^^^

@@ -3,6 +3,6 @@ true
 42
 4.2
 abc
-<string>:7:11: error: str expects 1 argument
+<string>:7:11: error: function str expects 1 argument, but 0 were provided
     print(str());
-          ^^^
+          ^^^^^

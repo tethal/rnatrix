@@ -3,7 +3,6 @@ use crate::ctx::CompilerContext;
 use crate::error::{err_at, NxError, NxResult};
 use crate::src::{SourceId, Span};
 use crate::token::{Token, TokenType, Tokenizer};
-use std::rc::Rc;
 use std::str::FromStr;
 
 pub type ParseResult<T> = NxResult<T>;
@@ -355,6 +354,22 @@ impl<'ctx> Parser<'ctx> {
                         span,
                     );
                 }
+                TokenType::LParen => {
+                    self.consume()?;
+                    let args = if self.tt() == TokenType::RParen {
+                        Vec::new()
+                    } else {
+                        self.expr_list()?
+                    };
+                    let span = expr.span.extend_to(self.expect(TokenType::RParen)?.span);
+                    expr = Expr::new(
+                        ExprKind::Call {
+                            callee: Box::new(expr),
+                            args,
+                        },
+                        span,
+                    );
+                }
                 _ => return Ok(expr),
             }
         }
@@ -381,9 +396,9 @@ impl<'ctx> Parser<'ctx> {
             TokenType::KwNull => Ok(Expr::new(ExprKind::NullLiteral, self.consume()?.span)),
             TokenType::StringLiteral => {
                 let span = self.span();
-                let value = Rc::new(decode_string_literal(self.lexeme()));
+                let value = decode_string_literal(self.lexeme());
                 self.consume()?;
-                Ok(Expr::new(ExprKind::StringLiteral(value), span))
+                Ok(Expr::new(ExprKind::StringLiteral(value.into()), span))
             }
             TokenType::LBracket => {
                 let start_span = self.consume()?.span;
@@ -404,25 +419,7 @@ impl<'ctx> Parser<'ctx> {
             TokenType::Identifier => {
                 let name_span = self.span();
                 let name = self.consume()?.name.unwrap();
-                if self.tt() == TokenType::LParen {
-                    self.consume()?;
-                    let args = if self.tt() == TokenType::RParen {
-                        Vec::new()
-                    } else {
-                        self.expr_list()?
-                    };
-                    let span = name_span.extend_to(self.expect(TokenType::RParen)?.span);
-                    Ok(Expr::new(
-                        ExprKind::Call {
-                            name,
-                            name_span,
-                            args,
-                        },
-                        span,
-                    ))
-                } else {
-                    Ok(Expr::new(ExprKind::Var(name), name_span))
-                }
+                Ok(Expr::new(ExprKind::Var(name), name_span))
             }
             tt => self.err(format!("expected expression, not {:?}", tt)),
         }

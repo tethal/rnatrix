@@ -13,19 +13,37 @@ pub enum ValueType {
     Float,
     String,
     List,
+    Function,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Value(ValueImpl);
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 enum ValueImpl {
     Null,
     Bool(bool),
     Int(i64),
     Float(f64),
-    String(Rc<String>),
+    String(Rc<str>),
     List(Rc<RefCell<Vec<Value>>>),
+    Function(Rc<FunctionObject>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CodeHandle(pub usize);
+
+pub const BUILTIN_FLOAT: CodeHandle = CodeHandle(usize::MAX - 1);
+pub const BUILTIN_INT: CodeHandle = CodeHandle(usize::MAX - 2);
+pub const BUILTIN_LEN: CodeHandle = CodeHandle(usize::MAX - 3);
+pub const BUILTIN_PRINT: CodeHandle = CodeHandle(usize::MAX - 4);
+pub const BUILTIN_STR: CodeHandle = CodeHandle(usize::MAX - 5);
+
+#[derive(Debug)]
+pub struct FunctionObject {
+    pub name: Box<str>,
+    pub arity: usize,
+    pub code_handle: CodeHandle,
 }
 
 impl Value {
@@ -45,12 +63,16 @@ impl Value {
         Value(ValueImpl::Float(v))
     }
 
-    pub fn from_string(v: Rc<String>) -> Self {
+    pub fn from_string(v: Rc<str>) -> Self {
         Value(ValueImpl::String(v))
     }
 
     pub fn from_list(v: Rc<RefCell<Vec<Value>>>) -> Self {
         Value(ValueImpl::List(v))
+    }
+
+    pub fn from_function(v: Rc<FunctionObject>) -> Self {
+        Value(ValueImpl::Function(v))
     }
 
     pub fn get_type(&self) -> ValueType {
@@ -61,6 +83,7 @@ impl Value {
             ValueImpl::Float(_) => ValueType::Float,
             ValueImpl::String(_) => ValueType::String,
             ValueImpl::List(_) => ValueType::List,
+            ValueImpl::Function(_) => ValueType::Function,
         }
     }
 
@@ -88,6 +111,10 @@ impl Value {
         matches!(self.0, ValueImpl::List(_))
     }
 
+    pub fn is_function(&self) -> bool {
+        matches!(self.0, ValueImpl::Function(_))
+    }
+
     pub fn is_numeric(&self) -> bool {
         matches!(self.get_type(), ValueType::Int | ValueType::Float)
     }
@@ -113,7 +140,7 @@ impl Value {
         }
     }
 
-    pub fn unwrap_string(&self) -> Rc<String> {
+    pub fn unwrap_string(&self) -> Rc<str> {
         match &self.0 {
             ValueImpl::String(v) => v.clone(),
             _ => panic!("expected string, got {:?}", self.get_type()),
@@ -127,8 +154,15 @@ impl Value {
         }
     }
 
+    pub fn unwrap_function(&self) -> Rc<FunctionObject> {
+        match &self.0 {
+            ValueImpl::Function(v) => v.clone(),
+            _ => panic!("expected function, got {:?}", self.get_type()),
+        }
+    }
+
     // Internal helpers - return reference to Rc (no refcount bump)
-    fn string_ref(&self) -> &Rc<String> {
+    fn string_ref(&self) -> &Rc<str> {
         match &self.0 {
             ValueImpl::String(s) => s,
             _ => panic!("expected string, got {:?}", self.get_type()),
@@ -139,6 +173,13 @@ impl Value {
         match &self.0 {
             ValueImpl::List(v) => v,
             _ => panic!("expected list, got {:?}", self.get_type()),
+        }
+    }
+
+    fn function_ref(&self) -> &Rc<FunctionObject> {
+        match &self.0 {
+            ValueImpl::Function(v) => v,
+            _ => panic!("expected function, got {:?}", self.get_type()),
         }
     }
 
@@ -181,11 +222,8 @@ impl Value {
     pub fn add(&self, other: &Value, op_span: Span) -> NxResult<Value> {
         // String concatenation
         if self.is_string() && other.is_string() {
-            return Ok(Value::from_string(Rc::new(format!(
-                "{}{}",
-                self.string_ref(),
-                other.string_ref()
-            ))));
+            let concatenated = format!("{}{}", self.string_ref(), other.string_ref());
+            return Ok(Value::from_string(concatenated.into()));
         }
 
         // List concatenation
@@ -237,7 +275,7 @@ impl Value {
             for _ in 0..cnt {
                 result.push_str(s);
             }
-            return Ok(Value::from_string(Rc::new(result)));
+            return Ok(Value::from_string(result.into()));
         }
 
         if self.is_int() && other.is_string() {
@@ -314,9 +352,9 @@ impl Value {
         }
 
         // Lists - element-wise comparison
-        if let (ValueImpl::List(l1), ValueImpl::List(l2)) = (&self.0, &other.0) {
-            let v1 = l1.borrow();
-            let v2 = l2.borrow();
+        if self.is_list() && other.is_list() {
+            let v1 = self.list_ref().borrow();
+            let v2 = other.list_ref().borrow();
 
             if v1.len() != v2.len() {
                 return Ok(Value::FALSE);
@@ -328,6 +366,14 @@ impl Value {
                 }
             }
             return Ok(Value::TRUE);
+        }
+
+        // Functions
+        if self.is_function() && other.is_function() {
+            return Ok(Value::from_bool(Rc::ptr_eq(
+                self.function_ref(),
+                other.function_ref(),
+            )));
         }
 
         // Bools
@@ -438,7 +484,7 @@ impl Value {
 
     // Other operations
     pub fn str(&self) -> Value {
-        Value::from_string(Rc::new(format!("{}", self)))
+        Value::from_string(format!("{}", self).into())
     }
 
     pub fn len(&self, span: Span) -> NxResult<Value> {
@@ -557,6 +603,9 @@ impl Display for Value {
                     }
                 }
                 write!(f, "]")
+            }
+            ValueImpl::Function(fun) => {
+                write!(f, "<function {} at {:#x}>", fun.name, fun.code_handle.0)
             }
         }
     }

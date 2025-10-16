@@ -1,3 +1,3 @@
-<string>:2:5: error: undeclared function "foo"
+<string>:2:5: error: undeclared variable "foo"
     foo();
     ^^^
