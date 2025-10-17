@@ -5,36 +5,13 @@ use crate::ctx::{CompilerContext, Name};
 use crate::error::{AttachErrSpan, SourceError, SourceResult};
 use crate::src::Span;
 use natrix_runtime::nx_err::{nx_err, nx_error, NxResult};
-use natrix_runtime::value::{
-    CodeHandle, FunctionObject, Value, ValueType, BUILTIN_FLOAT, BUILTIN_INT,
-    BUILTIN_LEN, BUILTIN_PRINT, BUILTIN_STR,
-};
+use natrix_runtime::runtime::{Builtin, Runtime};
+use natrix_runtime::value::{CodeHandle, FunctionObject, Value, ValueType};
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::convert::Into;
-use std::io;
-use std::io::Write;
 use std::rc::Rc;
-
-pub struct Interpreter<'ctx, W: Write = io::Stdout> {
-    ctx: &'ctx CompilerContext,
-    output: W,
-    globals: Rc<Env>,
-    fun_decls: Vec<Rc<FunDecl>>,
-}
-
-impl<'ctx> Interpreter<'ctx, io::Stdout> {
-    pub fn new(ctx: &'ctx mut CompilerContext) -> Self {
-        let globals = Env::new_root(ctx);
-        Self {
-            ctx,
-            output: io::stdout(),
-            globals,
-            fun_decls: Vec::new(),
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 enum StmtFlow {
@@ -52,38 +29,35 @@ struct Env {
 impl Env {
     fn new_root(ctx: &mut CompilerContext) -> Rc<Env> {
         let mut vars: HashMap<Name, Value> = HashMap::new();
-        Env::define_builtin(ctx, &mut vars, "print", 1, BUILTIN_PRINT);
-        Env::define_builtin(ctx, &mut vars, "len", 1, BUILTIN_LEN);
-        Env::define_builtin(ctx, &mut vars, "str", 1, BUILTIN_STR);
-        Env::define_builtin(ctx, &mut vars, "int", 1, BUILTIN_INT);
-        Env::define_builtin(ctx, &mut vars, "float", 1, BUILTIN_FLOAT);
+        for builtin in Builtin::ALL {
+            Env::define_builtin(ctx, &mut vars, builtin);
+        }
         let env = Rc::new(Env {
             vars: RefCell::new(vars),
             parent: None,
         });
-        env
+        // wrap builtin (read-only) scope in a global, writable scope
+        Env::new(env)
     }
 
-    fn new(parent: &Rc<Env>) -> Rc<Env> {
+    fn new(parent: Rc<Env>) -> Rc<Env> {
         Rc::new(Self {
             vars: RefCell::new(HashMap::new()),
-            parent: Some(parent.clone()),
+            parent: Some(parent),
         })
     }
 
     fn define_builtin(
         ctx: &mut CompilerContext,
         vars: &mut HashMap<Name, Value>,
-        name: &str,
-        arity: usize,
-        code_handle: CodeHandle,
+        builtin: &Builtin,
     ) {
         vars.insert(
-            ctx.interner.intern(name),
+            ctx.interner.intern(builtin.name()),
             Value::from_function(Rc::new(FunctionObject {
-                name: name.into(),
-                arity,
-                code_handle,
+                name: builtin.name().into(),
+                arity: builtin.arity(),
+                code_handle: builtin.as_code_handle(),
             })),
         );
     }
@@ -134,30 +108,29 @@ impl Env {
     }
 }
 
-impl<'ctx, W: Write> Interpreter<'ctx, W> {
-    pub fn with_output(ctx: &'ctx mut CompilerContext, output: W) -> Self {
+pub struct Interpreter<'ctx> {
+    ctx: &'ctx CompilerContext,
+    rt: &'ctx mut Runtime,
+    globals: Rc<Env>,
+    fun_decls: Vec<Rc<FunDecl>>,
+}
+
+impl<'ctx> Interpreter<'ctx> {
+    pub fn new(ctx: &'ctx mut CompilerContext, rt: &'ctx mut Runtime) -> Self {
         let globals = Env::new_root(ctx);
         Self {
             ctx,
-            output,
+            rt,
             globals,
             fun_decls: Vec::new(),
         }
-    }
-
-    fn print(&mut self, span: Span, value: &Value) -> SourceResult<()> {
-        self.output
-            .write_fmt(format_args!("{}\n", value))
-            .map_err(|e| error_at(span, e.to_string()))
     }
 
     pub fn run(&mut self, program: Program, args: Vec<Value>) -> SourceResult<Value> {
         let main_name = self.ctx.interner.lookup("main");
         let mut main_fun: Option<(Value, Span)> = None;
         for decl in program.decls {
-            let decl = Rc::new(decl);
             let index = self.fun_decls.len();
-            self.fun_decls.push(decl.clone());
             let fun_obj = Value::from_function(Rc::new(FunctionObject {
                 name: self.ctx.interner.resolve(decl.name).into(),
                 arity: decl.params.len(),
@@ -169,6 +142,7 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
             self.globals
                 .declare(self.ctx, decl.name, fun_obj)
                 .err_at(decl.name_span)?;
+            self.fun_decls.push(Rc::new(decl));
         }
         match main_fun {
             Some((fun_decl, span)) => self.dispatch(span, fun_decl, args),
@@ -195,21 +169,17 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
             );
         }
 
-        match fun_obj.code_handle {
-            BUILTIN_FLOAT => args[0].float().err_at(span),
-            BUILTIN_INT => args[0].int().err_at(span),
-            BUILTIN_LEN => args[0].len().err_at(span),
-            BUILTIN_PRINT => {
-                self.print(span, &args[0])?;
-                Ok(Value::NULL)
-            }
-            BUILTIN_STR => Ok(args[0].str()),
-            CodeHandle(index) => self.invoke(self.fun_decls.get(index).unwrap().clone(), args),
+        match Builtin::from_code_handle(fun_obj.code_handle) {
+            Some(builtin) => self.rt.dispatch_builtin(builtin, &args).err_at(span),
+            None => self.invoke(
+                self.fun_decls.get(fun_obj.code_handle.0).unwrap().clone(),
+                args,
+            ),
         }
     }
 
     fn invoke(&mut self, fun_decl: Rc<FunDecl>, args: Vec<Value>) -> SourceResult<Value> {
-        let env = Env::new(&self.globals);
+        let env = Env::new(self.globals.clone());
         for (param, arg) in fun_decl.params.iter().zip(args) {
             env.declare(self.ctx, param.name, arg)
                 .err_at(param.name_span)?;
@@ -240,7 +210,7 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                 Ok(StmtFlow::Next)
             }
             StmtKind::Block(stmts) => {
-                let inner_env = Env::new(env);
+                let inner_env = Env::new(env.clone());
                 for stmt in stmts {
                     let flow = self.do_stmt(&inner_env, stmt)?;
                     if !matches!(flow, StmtFlow::Next) {

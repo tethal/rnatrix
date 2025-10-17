@@ -2,7 +2,6 @@ use crate::nx_err::{nx_err, nx_error, NxResult};
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
-use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueType {
@@ -31,12 +30,6 @@ enum ValueImpl {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CodeHandle(pub usize);
-
-pub const BUILTIN_FLOAT: CodeHandle = CodeHandle(usize::MAX - 1);
-pub const BUILTIN_INT: CodeHandle = CodeHandle(usize::MAX - 2);
-pub const BUILTIN_LEN: CodeHandle = CodeHandle(usize::MAX - 3);
-pub const BUILTIN_PRINT: CodeHandle = CodeHandle(usize::MAX - 4);
-pub const BUILTIN_STR: CodeHandle = CodeHandle(usize::MAX - 5);
 
 #[derive(Debug)]
 pub struct FunctionObject {
@@ -467,18 +460,7 @@ impl Value {
         }
     }
 
-    // Other operations
-    pub fn str(&self) -> Value {
-        Value::from_string(format!("{}", self).into())
-    }
-
-    pub fn len(&self) -> NxResult<Value> {
-        match &self.0 {
-            ValueImpl::String(s) => Ok(Value::from_int(s.len() as i64)),
-            ValueImpl::List(l) => Ok(Value::from_int(l.borrow().len() as i64)),
-            _ => nx_err(format!("len cannot be applied to {:?}", self.get_type())),
-        }
-    }
+    // Index operations
 
     pub fn get_item(&self, index: Value) -> NxResult<Value> {
         if !index.is_int() {
@@ -533,29 +515,6 @@ impl Value {
         }
 
         nx_err("only lists support indexing in assignments")
-    }
-
-    pub fn int(&self) -> NxResult<Value> {
-        match &self.0 {
-            ValueImpl::Int(i) => Ok(Value::from_int(*i)),
-            // Truncates towards zero, saturates on overflow, NaN → 0
-            ValueImpl::Float(f) => Ok(Value::from_int(*f as i64)),
-            ValueImpl::String(s) => Ok(Value::from_int(
-                i64::from_str(s).map_err(|e| nx_error(e.to_string()))?,
-            )),
-            _ => nx_err(format!("int cannot be applied to {:?}", self.get_type())),
-        }
-    }
-
-    pub fn float(&self) -> NxResult<Value> {
-        match &self.0 {
-            ValueImpl::Int(i) => Ok(Value::from_float(*i as f64)),
-            ValueImpl::Float(f) => Ok(Value::from_float(*f)),
-            ValueImpl::String(s) => Ok(Value::from_float(
-                f64::from_str(s).map_err(|e| nx_error(e.to_string()))?,
-            )),
-            _ => nx_err(format!("float cannot be applied to {:?}", self.get_type())),
-        }
     }
 }
 

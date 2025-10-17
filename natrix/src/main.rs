@@ -2,6 +2,7 @@ use natrix_compiler::ast::interpreter::Interpreter;
 use natrix_compiler::ctx::CompilerContext;
 use natrix_compiler::error::SourceResult;
 use natrix_compiler::parser::parse;
+use natrix_runtime::runtime::Runtime;
 use natrix_runtime::value::Value;
 
 fn parse_and_eval(ctx: &mut CompilerContext, src: &str, arg: i64) -> SourceResult<Value> {
@@ -11,7 +12,8 @@ fn parse_and_eval(ctx: &mut CompilerContext, src: &str, arg: i64) -> SourceResul
         .expect("Unable to load source file");
     let program = parse(ctx, source_id)?;
     println!("{:?}", program.debug_with(&ctx));
-    let mut interpreter = Interpreter::new(ctx);
+    let mut rt = Runtime::new();
+    let mut interpreter = Interpreter::new(ctx, &mut rt);
     interpreter.run(program, vec![Value::from_int(arg)])
 }
 
