@@ -84,3 +84,14 @@ impl Display for ErrorDisplay<'_> {
         }
     }
 }
+
+pub fn err_at<T>(span: Span, message: impl Into<Box<str>>) -> SourceResult<T> {
+    Err(error_at(span, message))
+}
+
+pub fn error_at(span: Span, message: impl Into<Box<str>>) -> SourceError {
+    SourceError {
+        message: message.into(),
+        span,
+    }
+}

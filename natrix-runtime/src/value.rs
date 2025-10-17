@@ -35,6 +35,7 @@ pub struct CodeHandle(pub usize);
 pub struct FunctionObject {
     pub name: Box<str>,
     pub arity: usize,
+    pub num_locals: usize,
     pub code_handle: CodeHandle,
 }
 

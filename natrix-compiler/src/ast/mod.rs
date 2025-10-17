@@ -1,10 +1,14 @@
 use crate::ctx::Name;
 use crate::src::Span;
+use natrix_runtime::nx_err::NxResult;
+use natrix_runtime::value::Value;
 use std::fmt::Debug;
 use std::rc::Rc;
 
 mod debug;
-pub mod interpreter;
+mod interpreter;
+
+pub use interpreter::Interpreter;
 
 macro_rules! ast_node {
     ($name:ident { $($field_name:ident: $field_type:ty),+ $(,)? }) => {
@@ -134,8 +138,35 @@ pub enum BinaryOp {
     Ge,
 }
 
+impl BinaryOp {
+    pub fn eval(&self, left: &Value, right: &Value) -> NxResult<Value> {
+        match self {
+            BinaryOp::Add => left.add(&right),
+            BinaryOp::Sub => left.sub(&right),
+            BinaryOp::Mul => left.mul(&right),
+            BinaryOp::Div => left.div(&right),
+            BinaryOp::Mod => left.rem(&right),
+            BinaryOp::Eq => left.eq(&right),
+            BinaryOp::Ne => left.ne(&right),
+            BinaryOp::Ge => left.ge(&right),
+            BinaryOp::Gt => left.gt(&right),
+            BinaryOp::Le => left.le(&right),
+            BinaryOp::Lt => left.lt(&right),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum UnaryOp {
     Neg,
     Not,
+}
+
+impl UnaryOp {
+    pub fn eval(&self, arg: &Value) -> NxResult<Value> {
+        match self {
+            UnaryOp::Neg => arg.negate(),
+            UnaryOp::Not => arg.not(),
+        }
+    }
 }

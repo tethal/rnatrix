@@ -16,10 +16,14 @@ This document specifies the bytecode format for the Natrix virtual machine (Phas
 struct Bytecode {
     code: Vec<u8>,          // Flat bytecode stream
     constants: Vec<Value>,  // Constant pool (high-level values)
+    globals: Vec<Value>,    // Global variables (user-defined functions, etc.)
 }
 ```
 
 Functions are compiled to offsets within the flat `code` array. Entry point is conventionally at offset 0.
+
+Global variables are pre-initialized when bytecode is loaded. Builtins are provided by the VM runtime and accessed
+separately from user-defined globals.
 
 ## Instruction Set
 
@@ -33,23 +37,24 @@ Functions are compiled to offsets within the flat `code` array. Entry point is c
 
 - `N` - unsigned LEB128 immediate (index into constant pool, variable table, etc.)
 - `offset` - signed LEB128 immediate (relative jump offset)
+- `int` - signed LEB128 immediate (integer literal)
 
 ---
 
 ### Constants and Literals
 
-| Opcode       | Immediates | Stack Effect        | Description                           |
-|--------------|------------|---------------------|---------------------------------------|
-| `push_const` | N          | `... -> ..., const` | Push constant from pool at index N    |
-| `push_null`  | -          | `... -> ..., null`  | Push null constant                    |
-| `push_true`  | -          | `... -> ..., true`  | Push boolean true                     |
-| `push_false` | -          | `... -> ..., false` | Push boolean false                    |
-| `push_0`     | -          | `... -> ..., 0`     | Push integer 0                        |
-| `push_1`     | -          | `... -> ..., 1`     | Push integer 1                        |
-| `push_i8`    | byte       | `... -> ..., int`   | Push signed 8-bit integer (-128..127) |
+| Opcode       | Immediates | Stack Effect        | Description                                     |
+|--------------|------------|---------------------|-------------------------------------------------|
+| `push_const` | N          | `... -> ..., const` | Push constant from pool at index N              |
+| `push_null`  | -          | `... -> ..., null`  | Push null constant                              |
+| `push_true`  | -          | `... -> ..., true`  | Push boolean true                               |
+| `push_false` | -          | `... -> ..., false` | Push boolean false                              |
+| `push_0`     | -          | `... -> ..., 0`     | Push integer 0                                  |
+| `push_1`     | -          | `... -> ..., 1`     | Push integer 1                                  |
+| `push_int`   | int        | `... -> ..., int`   | Push integer from SLEB128 immediate (any `i64`) |
 
-*Note: Special opcodes for common constants reduce bytecode size and avoid constant pool lookups. Integers outside the
--128..127 range use `push_const`.*
+*Note: Special opcodes for common constants reduce bytecode size. `push_int` uses SLEB128 encoding (1 byte for -64..63,
+more bytes for larger values). Integers are never stored in the constant pool.*
 
 ---
 
@@ -93,22 +98,30 @@ String comparisons use lexicographic ordering. Numeric comparisons work across i
 
 ### Variables
 
-| Opcode      | Immediates | Stack Effect        | Description                  |
-|-------------|------------|---------------------|------------------------------|
-| `load_var`  | N          | `... -> ..., value` | Load variable at index N     |
-| `load_1`    | -          | `... -> ..., value` | Load variable at index 1     |
-| `store_var` | N          | `..., value -> ...` | Store to variable at index N |
+| Opcode         | Immediates | Stack Effect        | Description                         |
+|----------------|------------|---------------------|-------------------------------------|
+| `load_var`     | N          | `... -> ..., value` | Load local variable at index N      |
+| `load_1`       | -          | `... -> ..., value` | Load local variable at index 1      |
+| `store_var`    | N          | `..., value -> ...` | Store to local variable at index N  |
+| `load_global`  | N          | `... -> ..., value` | Load global variable at index N     |
+| `store_global` | N          | `..., value -> ...` | Store to global variable at index N |
+| `load_builtin` | N          | `... -> ..., value` | Load builtin at index N             |
 
-Variable indices are **relative to the frame pointer** (`fp`):
+**Local variable indices** are **relative to the frame pointer** (`fp`):
 
 - Index 0: function object (not normally accessed; reserved for future reflection/introspection features)
 - Indices 1..arity: function arguments
 - Indices (arity+1)..: local variables
 
-All variables (arguments and locals) use the same addressing scheme with unsigned indices.
+All local variables (arguments and locals) use the same addressing scheme with unsigned indices.
 
 *Note: `load_1` is a special opcode for loading the first argument, which is extremely common for `self`/`this` in
 method calls and primary data arguments. Saves 1 byte per access.*
+
+**Global variable indices** reference the `bytecode.globals` array. Globals are pre-initialized when bytecode is loaded.
+
+**Builtin indices** reference the VM's builtin registry. Builtins are provided by the runtime and have stable indices
+independent of bytecode versioning.
 
 ---
 
@@ -154,6 +167,7 @@ pub struct CodeHandle(pub usize);
 pub struct FunctionObject {
     pub name: Box<str>,
     pub arity: usize,
+    pub num_locals: usize,
     pub code_handle: CodeHandle,
 }
 
@@ -172,6 +186,7 @@ enum ValueImpl {
     - Validates `function.arity == N` (runtime arity check)
     - Pushes new `CallFrame { return_ip, prev_fp }` to frame metadata stack
     - Sets `fp` to point to function object on value stack
+    - Reserves slots for locals by pushing num_locals NULL values
     - Sets `ip = function.id` (function start address)
 4. Callee executes with arguments and locals accessible via `fp + offset`
 5. `ret` instruction:
@@ -290,10 +305,20 @@ This deferred to **Phase 5**.
 
 ## Implementation Notes
 
-- **LEB128 encoding:** Variable-width integer encoding. Use signed variant (SLEB128) for jump offsets, unsigned for
-  indices.
-- **Constant pool:** Stores `Value` objects (including `Function` values). No serialization in Phase 2 (in-memory only).
-- **Static calls in Phase 2:** All function calls are statically resolved. Function objects placed in constant pool,
-  calls use `push_const <func>` + `call <arity>`.
-- **First-class functions in Phase 3+:** Same bytecode format. Variables can hold function values, `load_var` pushes
-  function, `call` works identically.
+- **LEB128 encoding:** Variable-width integer encoding. Use signed variant (SLEB128) for jump offsets and integer
+  literals, unsigned for indices.
+- **Constant pool:** Stores heap-allocated `Value` objects (strings, floats). Integers are never stored in the constant
+  pool - use `push_int` instead. No serialization in Phase 2 (in-memory only).
+- **Global variables:** User-defined functions and global variables are stored in `bytecode.globals` and pre-initialized
+  at load time. The assembler uses `.global N <initializer>` directives to populate this array.
+- **Builtins:** Provided by the VM runtime in a separate builtin registry. Builtin indices are stable across bytecode
+  versions (adding a new builtin doesn't invalidate existing bytecode).
+- **Static resolution:** The compiler knows at compile time which names are builtins, globals, or locals. It emits the
+  appropriate opcode (`load_builtin`, `load_global`, or `load_var`).
+- **First-class functions:** User-defined functions are stored in globals. Variables can hold function values, and
+  `call` works identically for all function types.
+- **Stack pointer implementation:** The value stack uses `Vec<Value>` with implicit stack pointer (`sp = stack.len()`).
+  Stack operations use `Vec::push`/`Vec::pop` rather than maintaining an explicit index. This is simple and safe for
+  Phase 2. The capacity check on each push is a known optimization point that can be addressed later with either manual
+  `unsafe` push (with explicit `sp` index) or pre-sizing the Vec. Modern branch predictors make the capacity check
+  negligible compared to actual Value operations.

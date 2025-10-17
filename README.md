@@ -176,6 +176,31 @@ enum Expr {
 - Matches production compiler patterns (rustc uses similar approach)
 - Easy to evolve - can add arena allocation or custom smart pointers later
 
+### HIR (High-level Intermediate Representation)
+
+Backend-independent semantic representation between AST and code generation.
+
+- **Separate types from AST** - HIR has distinct `hir::Expr` and `hir::Stmt` types, not generic/annotated AST
+- **Resolved symbols** - All variable references identify whether they're local/global/builtin with unique IDs
+- **Symbol tables with IDs** - `VarRef` contains IDs that index into `SymbolTable`, not inlined metadata
+- **Desugared constructs** - Syntactic sugar removed (e.g., `Paren` eliminated, future: `for` → `while`)
+- **Backend-independent** - Shared by bytecode compiler (Phase 2) and native compiler (Phase 4)
+- **Mutable symbol metadata** - Can add attributes (type info, mutability tracking) to `SymbolTable` without rebuilding
+  HIR
+
+**Why separate from AST:**
+
+- **AST represents syntax** - Includes `Paren` for grouping, unresolved `Var(Name)` references
+- **HIR represents semantics** - Resolved references, no syntactic sugar, phase-specific invariants
+- **Type safety** - Cannot accidentally use unresolved AST in backends (compile-time guarantee)
+- **Separation of concerns** - Semantic analysis (symbol resolution) separate from code generation
+
+**Benefits:**
+
+- Enables optimizations common to all backends (constant folding can fold builtin calls like `int("42")`)
+- Cleaner code generation - backends don't need to resolve symbols or handle syntactic sugar
+- Extensible metadata - symbol tables can grow (add type info, usage tracking) without changing HIR structure
+
 ### AST Interpreter as Compiler Component
 
 The AST interpreter (Phase 1) is architecturally part of the compiler toolchain, not a standalone runtime:
@@ -186,6 +211,19 @@ The AST interpreter (Phase 1) is architecturally part of the compiler toolchain,
 
 This contrasts with the bytecode VM (Phase 2+), which will be a standalone runtime with no dependencies on compiler
 infrastructure (uses string constant pool, line number tables, no interning).
+
+**AST Interpreter as Reference Implementation:**
+
+The AST interpreter serves as the semantic reference for compiler correctness. It intentionally duplicates logic
+(scope resolution, evaluation semantics) rather than sharing code with the compiler:
+
+- **Independent verification** - Compiler and interpreter can catch each other's bugs
+- **Simplicity over optimization** - Interpreter should be obviously correct, not clever
+- **Code duplication is a feature** - Different implementations ensure semantic consistency
+
+The compiler pipeline (scope analysis, constant folding, optimizations) will eventually produce annotated/transformed
+AST (HIR) that could be consumed by a simplified interpreter, but the original standalone interpreter remains valuable
+for testing that compiler transformations preserve semantics.
 
 ### Runtime Value Representation
 

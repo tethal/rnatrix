@@ -1,8 +1,6 @@
-use crate::ast::{
-    AssignTargetKind, BinaryOp, Expr, ExprKind, FunDecl, Program, Stmt, StmtKind, UnaryOp,
-};
+use crate::ast::{AssignTargetKind, Expr, ExprKind, FunDecl, Program, Stmt, StmtKind};
 use crate::ctx::{CompilerContext, Name};
-use crate::error::{AttachErrSpan, SourceError, SourceResult};
+use crate::error::{err_at, AttachErrSpan, SourceResult};
 use crate::src::Span;
 use natrix_runtime::nx_err::{nx_err, nx_error, NxResult};
 use natrix_runtime::runtime::{Builtin, Runtime};
@@ -57,6 +55,7 @@ impl Env {
             Value::from_function(Rc::new(FunctionObject {
                 name: builtin.name().into(),
                 arity: builtin.arity(),
+                num_locals: 0,
                 code_handle: builtin.as_code_handle(),
             })),
         );
@@ -134,6 +133,7 @@ impl<'ctx> Interpreter<'ctx> {
             let fun_obj = Value::from_function(Rc::new(FunctionObject {
                 name: self.ctx.interner.resolve(decl.name).into(),
                 arity: decl.params.len(),
+                num_locals: 0,
                 code_handle: CodeHandle(index),
             }));
             if main_name == Some(decl.name) {
@@ -283,19 +283,7 @@ impl<'ctx> Interpreter<'ctx> {
             } => {
                 let left = self.eval(env, left)?;
                 let right = self.eval(env, right)?;
-                match op {
-                    BinaryOp::Add => left.add(&right).err_at(*op_span),
-                    BinaryOp::Sub => left.sub(&right).err_at(*op_span),
-                    BinaryOp::Mul => left.mul(&right).err_at(*op_span),
-                    BinaryOp::Div => left.div(&right).err_at(*op_span),
-                    BinaryOp::Mod => left.rem(&right).err_at(*op_span),
-                    BinaryOp::Eq => left.eq(&right).err_at(*op_span),
-                    BinaryOp::Ne => left.ne(&right).err_at(*op_span),
-                    BinaryOp::Ge => left.ge(&right).err_at(*op_span),
-                    BinaryOp::Gt => left.gt(&right).err_at(*op_span),
-                    BinaryOp::Le => left.le(&right).err_at(*op_span),
-                    BinaryOp::Lt => left.lt(&right).err_at(*op_span),
-                }
+                op.eval(&left, &right).err_at(*op_span)
             }
             ExprKind::BoolLiteral(value) => Ok(Value::from_bool(*value)),
             ExprKind::Call { callee, args } => {
@@ -336,10 +324,7 @@ impl<'ctx> Interpreter<'ctx> {
             ExprKind::StringLiteral(value) => Ok(Value::from_string(value.clone())),
             ExprKind::Unary { op, op_span, expr } => {
                 let val = self.eval(env, expr)?;
-                match op {
-                    UnaryOp::Neg => val.negate().err_at(*op_span),
-                    UnaryOp::Not => val.not().err_at(*op_span),
-                }
+                op.eval(&val).err_at(*op_span)
             }
             ExprKind::Var(name) => env.lookup(self.ctx, name).err_at(expr.span),
         }
@@ -352,16 +337,5 @@ impl<'ctx> Interpreter<'ctx> {
         } else {
             Ok(value.unwrap_bool())
         }
-    }
-}
-
-fn err_at<T>(span: Span, message: impl Into<Box<str>>) -> SourceResult<T> {
-    Err(error_at(span, message))
-}
-
-fn error_at(span: Span, message: impl Into<Box<str>>) -> SourceError {
-    SourceError {
-        message: message.into(),
-        span,
     }
 }

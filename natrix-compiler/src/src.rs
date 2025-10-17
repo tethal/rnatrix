@@ -107,6 +107,13 @@ pub struct Span {
 }
 
 impl Span {
+    #[cfg(test)]
+    pub(crate) const DUMMY: Span = Span {
+        source_id: SourceId(NonZeroUsize::MAX),
+        start: 0,
+        end: 0,
+    };
+
     fn new(source: &Source, start: usize, end: usize) -> Self {
         assert!(start <= end);
         assert!(end <= source.content.len());
@@ -136,6 +143,14 @@ impl Span {
             source_id: self.source_id,
             start: self.start,
             end: end.end,
+        }
+    }
+
+    pub fn tail(&self) -> Span {
+        Span {
+            source_id: self.source_id,
+            start: self.end,
+            end: self.end,
         }
     }
 
@@ -381,5 +396,11 @@ mod tests {
         let sid = sources.add_from_string("");
         let s = sources.get_by_id(sid);
         assert_eq!(s.get_line(1), "");
+    }
+
+    #[test]
+    fn test_dummy() {
+        assert_eq!(Span::DUMMY.start, 0);
+        assert_eq!(Span::DUMMY.end, 0);
     }
 }

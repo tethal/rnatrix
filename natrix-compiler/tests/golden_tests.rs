@@ -1,4 +1,4 @@
-use natrix_compiler::ast::interpreter::Interpreter;
+use natrix_compiler::ast::Interpreter;
 use natrix_compiler::ctx::CompilerContext;
 use natrix_compiler::parser::parse;
 use natrix_compiler::token::{TokenType, Tokenizer};

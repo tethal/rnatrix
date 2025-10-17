@@ -51,78 +51,72 @@ See [[README]] for project overview and design decisions.
 
 ### Implementation Steps
 
-1. **Design bytecode format**
-    - [X] Opcodes and operand encoding (variable-width instructions)
-    - [X] Instruction set design (stack-based)
-    - [ ] Define `Bytecode` structure: `{ code: Vec<u8>, constants: Vec<Value> }`
-    - [X] Document bytecode format and calling convention
+**1. HIR Infrastructure**
 
-2. **Build assembler**
-    - [ ] Instruction parsing
-    - [ ] Label resolution
-    - [ ] Constant pool building
+- [ ] Define HIR types (`hir::Expr`, `hir::Stmt`, `hir::Program`)
+- [ ] Define `VarRef` enum (Local/Global/Builtin with IDs)
+- [ ] Define symbol table types (`LocalId`, `GlobalId`, `SymbolTable`, `LocalInfo`, `GlobalInfo`)
+- [ ] Build analyzer module: scope resolution, symbol table construction
+- [ ] Entry point: `analyze(ast: &ast::Program) -> SourceResult<hir::Program>`
+- [ ] Test: Simple programs compile to HIR with correct symbol resolution
 
-3. **Build disassembler**
-    - [ ] Parse flat byte array into human-readable instructions
-    - [ ] Pretty-print with constant pool references
-    - [ ] Test with handwritten bytecode
+**2. Sample optimization Pass**
 
-4. **VM core (expressions only)**
-    - [ ] Stack machine implementation
-    - [ ] Instruction dispatch loop
-    - [ ] Arithmetic and logic operations
-    - [ ] Constant loading from pool
-    - [ ] API: `fn execute(&self, entry_offset: usize, args: &[Value]) -> Result<Value>`
+- [ ] Simple constant folding on HIR
+- [ ] Also fold builtin calls (e.g., `int("42")`)
+- [ ] Test: Constant expressions fold correctly at HIR level
 
-5. **Compiler IR design**
-    - [ ] High-level instruction representation (not yet encoded to bytes)
-    - [ ] Label-based addressing (labels resolve to offsets later)
-    - [ ] Easy to generate from AST
+**3. Bytecode Infrastructure**
 
-6. **Assembler (IR → Bytecode)**
-    - [ ] Resolve labels to byte offsets
-    - [ ] Encode instructions to `Vec<u8>`
-    - [ ] Build constant pool (`Vec<Value>`)
-    - [ ] Variable-width instruction encoding
+- [ ] Introduce `BytecodeBuilder`
+- [ ] Define final `Bytecode` structure: `{ code: Vec<u8>, constants: Vec<Value>, globals: Vec<Value> }`
+- [ ] Implement LEB128 encoding helpers (SLEB128 for signed, ULEB128 for unsigned)
+- [ ] Implement encoder: `BytecodeBuilder → Vec<u8>` (label resolution, constant pooling, encoding)
 
-7. **Compiler (expressions)**
-    - [ ] AST → IR for arithmetic/logic expressions
-    - [ ] Generate stack-based code
-    - [ ] Test against Phase 1 evaluator for correctness
+**4. Simple Bytecode Compiler + VM (minimal language subset)**
 
-8. **Extend: variables & functions**
-    - [ ] Local variables (stack slots)
-    - [ ] Function calls (jumps to offsets in flat bytecode)
-    - [ ] Return values
-    - [ ] Function arguments via stack
+- **Language subset:** integers, bools, null, arithmetic, comparisons, single function (no arguments), return
+- [ ] Compiler: HIR → BytecodeBuilder for expressions and return statements
+- [ ] VM: Stack machine with value stack (`Vec<Value>`)
+- [ ] VM: Instruction dispatch loop for basic opcodes (push, arithmetic, comparisons, ret)
+- [ ] Entry point: `execute(bytecode: Bytecode) -> Result<Value>`
+- [ ] Test: `fn main() { return 2 + 3; }` compiles and executes correctly
 
-9. **Extend: control flow**
-    - [ ] If/else (conditional jumps)
-    - [ ] While loops (unconditional jumps)
-    - [ ] Break/continue (jumps to labels)
+**5. Variables and Control Flow**
 
-10. **Extend: strings**
-    - [ ] String constants in constant pool
-    - [ ] String concatenation and comparison operations
+- **Add to language:** local variables, if/else, while, break/continue
+- [ ] Compiler: Variable load/store instructions, jump label tracking
+- [ ] Compiler: Conditional jumps (jtrue/jfalse), unconditional jumps (jmp)
+- [ ] VM: Jump instructions (update instruction pointer)
+- [ ] Test: Loops, conditionals, local variable manipulation
 
-11. **Extend: lists**
-    - [ ] Heap allocation from VM
-    - [ ] List indexing and mutation
-    - [ ] List literals
+**6. Functions and Calls**
 
-12. *(Optional)* **Bytecode serialization**
-    - [ ] Serialize `Bytecode` to file format
-    - [ ] Deserialize and load for standalone execution
-    - [ ] Handle constant pool serialization (Value encoding)
+- **Add to language:** function arguments, multiple functions, function calls
+- [ ] Compiler: Function objects in globals array
+- [ ] Compiler: Call instruction emission, argument handling
+- [ ] VM: Frame metadata stack (`Vec<CallFrame>`)
+- [ ] VM: Frame management (push/pop CallFrame on call/ret, frame pointer tracking)
+- [ ] Test: Recursive functions (e.g., fibonacci), multiple function calls
+
+**7. Remaining Features (deferred - can be implemented in any order)**
+
+- [ ] **Floats** - Constant pool storage, numeric coercion in operators
+- [ ] **Strings** - Constant pool storage, concatenation, comparison, indexing
+- [ ] **Lists** - Heap allocation, `make_list`/`get_item`/`set_item` instructions
+- [ ] **Debugging metadata** - Variable name tables, line number tables for stack traces
+- [ ] **Disassembler** - Bytecode → human-readable instruction listing with constant pool references
 
 ### Rust Learning Focus
 
-- Byte-level data encoding and decoding
+- Designing compiler IR (high-level instruction representation)
+- Two-pass algorithms (symbol collection, code emission)
+- HashMap for symbol tables (constants, globals, labels)
+- Byte-level encoding (LEB128, variable-width instructions)
+- Frame-based VM architecture (stack + frame pointer)
 - Vectors as stacks
-- Variable-width instruction encoding
 - First `unsafe` code for performance (optional - instruction dispatch)
 - Understanding memory layout and alignment
-- Debugging low-level execution
 
 ### Design Decisions
 
@@ -297,6 +291,8 @@ Features that are interesting but not on the critical path for learning systems 
 
 ### Tooling & Infrastructure
 
+- [ ] Bytecode assembler (text format → bytecode for testing VM edge cases)
+- [ ] Bytecode serialization/deserialization (save/load compiled bytecode)
 - [ ] Standard library
 - [ ] Package manager
 - [ ] Language server protocol (IDE support)
