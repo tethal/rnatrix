@@ -51,78 +51,75 @@ See [[README]] for project overview and design decisions.
 
 ### Implementation Steps
 
-1. **Design bytecode format**
+1. **Design bytecode format** ✓
     - [X] Opcodes and operand encoding (variable-width instructions)
     - [X] Instruction set design (stack-based)
-    - [ ] Define `Bytecode` structure: `{ code: Vec<u8>, constants: Vec<Value> }`
     - [X] Document bytecode format and calling convention
+    - [ ] Define `Bytecode` structure: `{ code: Vec<u8>, constants: Vec<Value>, globals: Vec<Value> }`
 
-2. **Build assembler**
-    - [ ] Instruction parsing
-    - [ ] Label resolution
-    - [ ] Constant pool building
-
-3. **Build disassembler**
-    - [ ] Parse flat byte array into human-readable instructions
-    - [ ] Pretty-print with constant pool references
-    - [ ] Test with handwritten bytecode
-
-4. **VM core (expressions only)**
-    - [ ] Stack machine implementation
-    - [ ] Instruction dispatch loop
-    - [ ] Arithmetic and logic operations
-    - [ ] Constant loading from pool
-    - [ ] API: `fn execute(&self, entry_offset: usize, args: &[Value]) -> Result<Value>`
-
-5. **Compiler IR design**
-    - [ ] High-level instruction representation (not yet encoded to bytes)
-    - [ ] Label-based addressing (labels resolve to offsets later)
+2. **Design compiler IR**
+    - [ ] High-level instruction representation (symbolic labels, named globals)
+    - [ ] IR instruction enum (not yet encoded to bytes)
+    - [ ] Function representation in IR
     - [ ] Easy to generate from AST
 
-6. **Assembler (IR → Bytecode)**
-    - [ ] Resolve labels to byte offsets
-    - [ ] Encode instructions to `Vec<u8>`
-    - [ ] Build constant pool (`Vec<Value>`)
-    - [ ] Variable-width instruction encoding
+3. **Compiler + VM: Simple functions with expressions**
+    - [ ] Compiler: Single function, return statement, expression compilation
+    - [ ] Compiler: IR → Bytecode assembly (label resolution, constant pooling, LEB128 encoding)
+    - [ ] VM: Frame-based stack machine (value stack + frame metadata)
+    - [ ] VM: Instruction dispatch loop for arithmetic/logic/constants
+    - [ ] VM: `call_function(name, args)` API
+    - [ ] Test: `fn main() { return 2 + 3; }`
 
-7. **Compiler (expressions)**
-    - [ ] AST → IR for arithmetic/logic expressions
-    - [ ] Generate stack-based code
-    - [ ] Test against Phase 1 evaluator for correctness
+4. **Extend: Local variables**
+    - [ ] Compiler: Variable resolution (locals vs globals)
+    - [ ] Compiler: Local slot allocation
+    - [ ] VM: `load_var`, `store_var` (frame-relative addressing)
+    - [ ] Test: `fn main() { let x = 10; return x + 5; }`
 
-8. **Extend: variables & functions**
-    - [ ] Local variables (stack slots)
-    - [ ] Function calls (jumps to offsets in flat bytecode)
-    - [ ] Return values
-    - [ ] Function arguments via stack
+5. **Extend: Function arguments**
+    - [ ] Compiler: Arguments as locals at known offsets
+    - [ ] VM: Arguments already on stack before call (no VM changes needed)
+    - [ ] Test: `fn add(a, b) { return a + b; }`
 
-9. **Extend: control flow**
-    - [ ] If/else (conditional jumps)
-    - [ ] While loops (unconditional jumps)
-    - [ ] Break/continue (jumps to labels)
+6. **Extend: Function calls**
+    - [ ] Compiler: Global function registry, `call` instruction emission
+    - [ ] Compiler: Function objects in globals array
+    - [ ] VM: Frame management (push/pop CallFrame on call/ret)
+    - [ ] Test: Multiple functions calling each other
 
-10. **Extend: strings**
-    - [ ] String constants in constant pool
-    - [ ] String concatenation and comparison operations
+7. **Extend: Control flow**
+    - [ ] Compiler: If/else → conditional jumps
+    - [ ] Compiler: While loops → unconditional jumps
+    - [ ] Compiler: Break/continue → jump to labels
+    - [ ] VM: Jump instructions (jmp, jtrue, jfalse)
+    - [ ] Test: Loops, conditionals, recursion
 
-11. **Extend: lists**
-    - [ ] Heap allocation from VM
-    - [ ] List indexing and mutation
-    - [ ] List literals
+8. **Extend: Strings**
+    - [ ] Compiler: String literals in constant pool
+    - [ ] VM: String operations (concatenation, comparison, indexing)
+    - [ ] Test: String manipulation
 
-12. *(Optional)* **Bytecode serialization**
-    - [ ] Serialize `Bytecode` to file format
-    - [ ] Deserialize and load for standalone execution
-    - [ ] Handle constant pool serialization (Value encoding)
+9. **Extend: Lists**
+    - [ ] Compiler: List literals, indexing expressions
+    - [ ] VM: Heap allocation, list operations (make_list, get_item, set_item)
+    - [ ] Test: List creation, indexing, mutation
+
+10. **Build disassembler** (can be done anytime after step 3)
+    - [ ] Bytecode → human-readable instruction listing
+    - [ ] Pretty-print with constant pool references
+    - [ ] Use for debugging compiler output
 
 ### Rust Learning Focus
 
-- Byte-level data encoding and decoding
+- Designing compiler IR (high-level instruction representation)
+- Two-pass algorithms (symbol collection, code emission)
+- HashMap for symbol tables (constants, globals, labels)
+- Byte-level encoding (LEB128, variable-width instructions)
+- Frame-based VM architecture (stack + frame pointer)
 - Vectors as stacks
-- Variable-width instruction encoding
 - First `unsafe` code for performance (optional - instruction dispatch)
 - Understanding memory layout and alignment
-- Debugging low-level execution
 
 ### Design Decisions
 
@@ -297,6 +294,8 @@ Features that are interesting but not on the critical path for learning systems 
 
 ### Tooling & Infrastructure
 
+- [ ] Bytecode assembler (text format → bytecode for testing VM edge cases)
+- [ ] Bytecode serialization/deserialization (save/load compiled bytecode)
 - [ ] Standard library
 - [ ] Package manager
 - [ ] Language server protocol (IDE support)
