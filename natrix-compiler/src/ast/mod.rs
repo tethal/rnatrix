@@ -3,6 +3,9 @@ use crate::src::Span;
 use std::fmt::Debug;
 use std::rc::Rc;
 
+mod debug;
+pub mod interpreter;
+
 macro_rules! ast_node {
     ($name:ident { $($field_name:ident: $field_type:ty),+ $(,)? }) => {
         pub struct $name {
@@ -44,6 +47,11 @@ ast_node!(Expr {
     span: Span,
 });
 
+ast_node!(AssignTarget {
+    kind: AssignTargetKind,
+    span: Span,
+});
+
 pub enum ExprKind {
     ArrayAccess {
         array: Box<Expr>,
@@ -80,10 +88,15 @@ pub enum ExprKind {
     Var(Name),
 }
 
+pub enum AssignTargetKind {
+    ArrayAccess { array: Box<Expr>, index: Box<Expr> },
+    Var(Name),
+}
+
 pub enum StmtKind {
     Assign {
-        left: Expr,
-        right: Expr,
+        target: AssignTarget,
+        value: Expr,
     },
     Block(Vec<Stmt>),
     Break,

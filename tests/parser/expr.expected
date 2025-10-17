@@ -1,4 +1,4 @@
-Program @<string>:1-1:5-1
+Program @<string>:5:1-1
   FunDecl("main") @<string>:1:5-9
     Block @<string>:1-12:4-2
       Expr @<string>:2-5:3-13

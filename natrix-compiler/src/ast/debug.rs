@@ -1,4 +1,6 @@
-use crate::ast::{Expr, ExprKind, FunDecl, Param, Program, Stmt, StmtKind};
+use crate::ast::{
+    AssignTarget, AssignTargetKind, Expr, ExprKind, FunDecl, Param, Program, Stmt, StmtKind,
+};
 use crate::ctx::{CompilerContext, Name};
 use crate::src::Span;
 use std::fmt::{self, Debug, Formatter};
@@ -206,10 +208,10 @@ impl Debug for StmtDebug<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let span = self.stmt.span;
         match &self.stmt.kind {
-            StmtKind::Assign { left, right } => {
+            StmtKind::Assign { target, value } => {
                 self.fmt.header(f, "Assign", span)?;
-                self.fmt.expr(f, left)?;
-                self.fmt.expr(f, right)
+                self.fmt.assign_target(f, target)?;
+                self.fmt.expr(f, value)
             }
             StmtKind::Block(stmts) => {
                 self.fmt.header(f, "Block", span)?;
@@ -334,6 +336,22 @@ impl Debug for ExprDebug<'_> {
                 self.fmt.expr(f, expr)
             }
             ExprKind::Var(name) => self.fmt.header_with_name(f, "Var", span, *name),
+        }
+    }
+}
+
+impl_ast_debug!(AssignTarget as assign_target => AssignTargetDebug);
+
+impl Debug for AssignTargetDebug<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let span = self.assign_target.span;
+        match &self.assign_target.kind {
+            AssignTargetKind::ArrayAccess { array, index } => {
+                self.fmt.header(f, "ArrayAccess", span)?;
+                self.fmt.expr(f, array)?;
+                self.fmt.expr(f, index)
+            }
+            AssignTargetKind::Var(name) => self.fmt.header_with_name(f, "Var", span, *name),
         }
     }
 }

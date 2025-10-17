@@ -1,7 +1,10 @@
 [package]
-name = "natrix-core"
+name = "natrix-compiler"
 version = "0.1.0"
 edition = "2024"
+
+[dependencies]
+natrix-runtime = { path = "../natrix-runtime" }
 
 [dev-dependencies]
 test-utils = { path = "../test-utils" }

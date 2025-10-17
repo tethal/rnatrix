@@ -1,20 +1,22 @@
-use crate::ast::{BinaryOp, Expr, ExprKind, FunDecl, Param, Program, Stmt, StmtKind, UnaryOp};
+use crate::ast::{
+    AssignTarget, AssignTargetKind, BinaryOp, Expr, ExprKind, FunDecl, Param, Program, Stmt,
+    StmtKind, UnaryOp,
+};
 use crate::ctx::CompilerContext;
-use crate::error::{err_at, NxError, NxResult};
+use crate::error::{SourceError, SourceResult};
 use crate::src::{SourceId, Span};
 use crate::token::{Token, TokenType, Tokenizer};
 use std::str::FromStr;
 
-pub type ParseResult<T> = NxResult<T>;
+pub type ParseResult<T> = SourceResult<T>;
 
 pub fn parse(ctx: &mut CompilerContext, source_id: SourceId) -> ParseResult<Program> {
     let mut parser = Parser::new(ctx, source_id)?;
-    let start_span = parser.span();
     let mut fun_decls = Vec::new();
     while parser.tt() != TokenType::Eof {
         fun_decls.push(parser.fun_decl()?);
     }
-    Ok(Program::new(fun_decls, start_span.extend_to(parser.span())))
+    Ok(Program::new(fun_decls, parser.span()))
 }
 
 struct Parser<'ctx> {
@@ -23,7 +25,7 @@ struct Parser<'ctx> {
 }
 
 impl<'ctx> Parser<'ctx> {
-    fn new(ctx: &'ctx mut CompilerContext, source_id: SourceId) -> NxResult<Self> {
+    fn new(ctx: &'ctx mut CompilerContext, source_id: SourceId) -> SourceResult<Self> {
         let mut tokenizer = Tokenizer::new(ctx, source_id);
         let current_token = tokenizer.next_token()?;
         Ok(Parser {
@@ -32,7 +34,7 @@ impl<'ctx> Parser<'ctx> {
         })
     }
 
-    fn fun_decl(&mut self) -> NxResult<FunDecl> {
+    fn fun_decl(&mut self) -> SourceResult<FunDecl> {
         self.expect(TokenType::KwFun)?;
         let name_span = self.span();
         let name = self.expect(TokenType::Identifier)?.name.unwrap();
@@ -41,7 +43,7 @@ impl<'ctx> Parser<'ctx> {
         Ok(FunDecl::new(name, name_span, params, body))
     }
 
-    fn params(&mut self) -> NxResult<Vec<Param>> {
+    fn params(&mut self) -> SourceResult<Vec<Param>> {
         let mut params = Vec::new();
         self.expect(TokenType::LParen)?;
         if self.tt() != TokenType::RParen {
@@ -55,7 +57,7 @@ impl<'ctx> Parser<'ctx> {
         Ok(params)
     }
 
-    fn param(&mut self) -> NxResult<Param> {
+    fn param(&mut self) -> SourceResult<Param> {
         let name_span = self.span();
         let name = self.expect(TokenType::Identifier)?.name.unwrap();
         // match(Kind.COLON);
@@ -164,15 +166,23 @@ impl<'ctx> Parser<'ctx> {
             _ => {
                 let expr = self.expr()?;
                 if self.tt() == TokenType::Assign {
+                    let target = match expr.kind {
+                        ExprKind::Var(name) => {
+                            AssignTarget::new(AssignTargetKind::Var(name), expr.span)
+                        }
+                        ExprKind::ArrayAccess { array, index } => AssignTarget::new(
+                            AssignTargetKind::ArrayAccess { array, index },
+                            expr.span,
+                        ),
+                        _ => {
+                            return self.err("expected lvalue on the left side of assignment");
+                        }
+                    };
                     self.consume()?;
-                    if !is_lvalue(&expr) {
-                        err_at(expr.span, "expected lvalue on the left side of assignment")
-                    } else {
-                        let right = self.expr()?;
-                        self.expect(TokenType::Semicolon)?;
-                        let span = expr.span.extend_to(right.span);
-                        Ok(Stmt::new(StmtKind::Assign { left: expr, right }, span))
-                    }
+                    let value = self.expr()?;
+                    self.expect(TokenType::Semicolon)?;
+                    let span = target.span.extend_to(value.span);
+                    Ok(Stmt::new(StmtKind::Assign { target, value }, span))
                 } else {
                     self.expect(TokenType::Semicolon)?;
                     let span = expr.span;
@@ -435,7 +445,7 @@ impl<'ctx> Parser<'ctx> {
         Ok(values)
     }
 
-    fn expect(&mut self, tt: TokenType) -> NxResult<Token> {
+    fn expect(&mut self, tt: TokenType) -> SourceResult<Token> {
         if self.tt() == tt {
             self.consume()
         } else {
@@ -443,7 +453,7 @@ impl<'ctx> Parser<'ctx> {
         }
     }
 
-    fn consume(&mut self) -> NxResult<Token> {
+    fn consume(&mut self) -> SourceResult<Token> {
         let token = self.current_token;
         self.current_token = self.tokenizer.next_token()?;
         Ok(token)
@@ -461,23 +471,16 @@ impl<'ctx> Parser<'ctx> {
         self.tokenizer.lexeme(&self.current_token)
     }
 
-    fn err<T>(&self, message: impl Into<String>) -> NxResult<T> {
+    fn err<T>(&self, message: impl Into<Box<str>>) -> SourceResult<T> {
         Err(self.error(message))
     }
 
-    fn error(&self, message: impl Into<String>) -> NxError {
-        NxError {
+    fn error(&self, message: impl Into<Box<str>>) -> SourceError {
+        SourceError {
             message: message.into(),
-            span: Some(self.current_token.span),
+            span: self.current_token.span,
         }
     }
-}
-
-fn is_lvalue(expr: &Expr) -> bool {
-    matches!(
-        expr.kind,
-        ExprKind::Var(_) | ExprKind::ArrayAccess { array: _, index: _ }
-    )
 }
 
 /// Decodes a string literal by removing surrounding quotes and processing escape sequences.

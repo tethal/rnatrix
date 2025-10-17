@@ -4,4 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-natrix-core = { path = "../natrix-core" }
+natrix-compiler = { path = "../natrix-compiler" }
+natrix-runtime = { path = "../natrix-runtime" }

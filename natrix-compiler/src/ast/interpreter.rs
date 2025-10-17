@@ -1,8 +1,11 @@
-use crate::ast::{BinaryOp, Expr, ExprKind, FunDecl, Program, Stmt, StmtKind, UnaryOp};
+use crate::ast::{
+    AssignTargetKind, BinaryOp, Expr, ExprKind, FunDecl, Program, Stmt, StmtKind, UnaryOp,
+};
 use crate::ctx::{CompilerContext, Name};
-use crate::error::{err, err_at, error_at, NxResult};
+use crate::error::{AttachErrSpan, SourceError, SourceResult};
 use crate::src::Span;
-use crate::value::{
+use natrix_runtime::nx_err::{nx_err, nx_error, NxResult};
+use natrix_runtime::value::{
     CodeHandle, FunctionObject, Value, ValueType, BUILTIN_FLOAT, BUILTIN_INT,
     BUILTIN_LEN, BUILTIN_PRINT, BUILTIN_STR,
 };
@@ -48,15 +51,16 @@ struct Env {
 
 impl Env {
     fn new_root(ctx: &mut CompilerContext) -> Rc<Env> {
+        let mut vars: HashMap<Name, Value> = HashMap::new();
+        Env::define_builtin(ctx, &mut vars, "print", 1, BUILTIN_PRINT);
+        Env::define_builtin(ctx, &mut vars, "len", 1, BUILTIN_LEN);
+        Env::define_builtin(ctx, &mut vars, "str", 1, BUILTIN_STR);
+        Env::define_builtin(ctx, &mut vars, "int", 1, BUILTIN_INT);
+        Env::define_builtin(ctx, &mut vars, "float", 1, BUILTIN_FLOAT);
         let env = Rc::new(Env {
-            vars: RefCell::new(HashMap::new()),
+            vars: RefCell::new(vars),
             parent: None,
         });
-        env.define_builtin(ctx, "print", 1, BUILTIN_PRINT);
-        env.define_builtin(ctx, "len", 1, BUILTIN_LEN);
-        env.define_builtin(ctx, "str", 1, BUILTIN_STR);
-        env.define_builtin(ctx, "int", 1, BUILTIN_INT);
-        env.define_builtin(ctx, "float", 1, BUILTIN_FLOAT);
         env
     }
 
@@ -68,47 +72,64 @@ impl Env {
     }
 
     fn define_builtin(
-        &self,
         ctx: &mut CompilerContext,
+        vars: &mut HashMap<Name, Value>,
         name: &str,
         arity: usize,
         code_handle: CodeHandle,
     ) {
-        self.declare(
+        vars.insert(
             ctx.interner.intern(name),
             Value::from_function(Rc::new(FunctionObject {
                 name: name.into(),
                 arity,
                 code_handle,
             })),
-        )
-        .expect("duplicate built-in function");
+        );
     }
 
-    fn lookup(&self, name: &Name) -> Option<Value> {
-        self.vars
-            .borrow()
-            .get(name)
-            .cloned()
-            .or_else(|| self.parent.as_ref()?.lookup(name))
+    fn lookup(&self, ctx: &CompilerContext, name: &Name) -> NxResult<Value> {
+        match self.vars.borrow().get(name).cloned() {
+            Some(val) => Ok(val),
+            None => match &self.parent {
+                Some(parent) => parent.lookup(ctx, name),
+                None => nx_err(format!(
+                    "undeclared variable {:?}",
+                    ctx.interner.resolve(*name)
+                )),
+            },
+        }
     }
 
-    fn declare(&self, name: Name, value: Value) -> Result<(), ()> {
+    fn declare(&self, ctx: &CompilerContext, name: Name, value: Value) -> NxResult<()> {
         match self.vars.borrow_mut().entry(name) {
             Entry::Vacant(e) => {
                 e.insert(value);
                 Ok(())
             }
-            Entry::Occupied(_) => Err(()),
+            Entry::Occupied(_) => nx_err(format!(
+                "symbol {} already defined in this scope",
+                ctx.interner.resolve(name)
+            )),
         }
     }
 
-    fn assign(&self, name: Name, value: Value) -> Result<(), ()> {
+    fn assign(&self, ctx: &CompilerContext, name: Name, value: Value) -> NxResult<()> {
         if let Some(slot) = self.vars.borrow_mut().get_mut(&name) {
-            *slot = value;
-            Ok(())
+            if self.parent.is_none() {
+                nx_err("built-in function cannot be assigned to")
+            } else {
+                *slot = value;
+                Ok(())
+            }
         } else {
-            self.parent.as_ref().ok_or(())?.assign(name, value)
+            self.parent
+                .as_ref()
+                .ok_or(nx_error(format!(
+                    "undeclared variable {:?}",
+                    ctx.interner.resolve(name)
+                )))?
+                .assign(ctx, name, value)
         }
     }
 }
@@ -124,13 +145,13 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
         }
     }
 
-    fn print(&mut self, span: Span, value: &Value) -> NxResult<()> {
+    fn print(&mut self, span: Span, value: &Value) -> SourceResult<()> {
         self.output
             .write_fmt(format_args!("{}\n", value))
             .map_err(|e| error_at(span, e.to_string()))
     }
 
-    pub fn run(&mut self, program: Program, args: Vec<Value>) -> NxResult<Value> {
+    pub fn run(&mut self, program: Program, args: Vec<Value>) -> SourceResult<Value> {
         let main_name = self.ctx.interner.lookup("main");
         let mut main_fun: Option<(Value, Span)> = None;
         for decl in program.decls {
@@ -145,23 +166,17 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
             if main_name == Some(decl.name) {
                 main_fun = Some((fun_obj.clone(), decl.name_span));
             }
-            self.globals.declare(decl.name, fun_obj).map_err(|_| {
-                error_at(
-                    decl.name_span,
-                    format!(
-                        "function {} already defined",
-                        self.ctx.interner.resolve(decl.name)
-                    ),
-                )
-            })?;
+            self.globals
+                .declare(self.ctx, decl.name, fun_obj)
+                .err_at(decl.name_span)?;
         }
         match main_fun {
             Some((fun_decl, span)) => self.dispatch(span, fun_decl, args),
-            None => err("no main function defined"),
+            None => err_at(program.span, "no main function defined"),
         }
     }
 
-    fn dispatch(&mut self, span: Span, callee: Value, args: Vec<Value>) -> NxResult<Value> {
+    fn dispatch(&mut self, span: Span, callee: Value, args: Vec<Value>) -> SourceResult<Value> {
         if !callee.is_function() {
             return err_at(span, format!("not a function: {}", callee));
         }
@@ -181,9 +196,9 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
         }
 
         match fun_obj.code_handle {
-            BUILTIN_FLOAT => args[0].float(span),
-            BUILTIN_INT => args[0].int(span),
-            BUILTIN_LEN => args[0].len(span),
+            BUILTIN_FLOAT => args[0].float().err_at(span),
+            BUILTIN_INT => args[0].int().err_at(span),
+            BUILTIN_LEN => args[0].len().err_at(span),
             BUILTIN_PRINT => {
                 self.print(span, &args[0])?;
                 Ok(Value::NULL)
@@ -193,18 +208,11 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
         }
     }
 
-    fn invoke(&mut self, fun_decl: Rc<FunDecl>, args: Vec<Value>) -> NxResult<Value> {
+    fn invoke(&mut self, fun_decl: Rc<FunDecl>, args: Vec<Value>) -> SourceResult<Value> {
         let env = Env::new(&self.globals);
         for (param, arg) in fun_decl.params.iter().zip(args) {
-            env.declare(param.name, arg).map_err(|_| {
-                error_at(
-                    param.name_span,
-                    format!(
-                        "parameter {} already defined",
-                        self.ctx.interner.resolve(param.name)
-                    ),
-                )
-            })?;
+            env.declare(self.ctx, param.name, arg)
+                .err_at(param.name_span)?;
         }
         match self.do_stmt(&env, &fun_decl.body)? {
             StmtFlow::Next => Ok(Value::NULL),
@@ -214,29 +222,20 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
         }
     }
 
-    fn do_stmt(&mut self, env: &Rc<Env>, stmt: &Stmt) -> NxResult<StmtFlow> {
+    fn do_stmt(&mut self, env: &Rc<Env>, stmt: &Stmt) -> SourceResult<StmtFlow> {
         match &stmt.kind {
-            StmtKind::Assign { left, right } => {
-                match &left.kind {
-                    ExprKind::Var(name) => {
-                        let val = self.eval(env, right)?;
-                        env.assign(*name, val).map_err(|_| {
-                            error_at(
-                                left.span,
-                                format!(
-                                    "undeclared variable {:?}",
-                                    self.ctx.interner.resolve(*name)
-                                ),
-                            )
-                        })?;
+            StmtKind::Assign { target, value } => {
+                match &target.kind {
+                    AssignTargetKind::Var(name) => {
+                        let val = self.eval(env, value)?;
+                        env.assign(self.ctx, *name, val).err_at(target.span)?;
                     }
-                    ExprKind::ArrayAccess { array, index } => {
+                    AssignTargetKind::ArrayAccess { array, index } => {
                         let array = self.eval(env, &array)?;
                         let index = self.eval(env, &index)?;
-                        let val = self.eval(env, right)?;
-                        array.set_item(index, val, left.span)?;
+                        let val = self.eval(env, value)?;
+                        array.set_item(index, val).err_at(target.span)?;
                     }
-                    _ => unreachable!(),
                 }
                 Ok(StmtFlow::Next)
             }
@@ -282,15 +281,7 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                 init,
             } => {
                 let val = self.eval(env, init)?;
-                env.declare(*name, val).map_err(|_| {
-                    error_at(
-                        *name_span,
-                        format!(
-                            "variable {:?} already defined",
-                            self.ctx.interner.resolve(*name)
-                        ),
-                    )
-                })?;
+                env.declare(self.ctx, *name, val).err_at(*name_span)?;
                 Ok(StmtFlow::Next)
             }
             StmtKind::While { cond, body } => {
@@ -307,12 +298,12 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
         }
     }
 
-    fn eval(&mut self, env: &Rc<Env>, expr: &Expr) -> NxResult<Value> {
+    fn eval(&mut self, env: &Rc<Env>, expr: &Expr) -> SourceResult<Value> {
         match &expr.kind {
             ExprKind::ArrayAccess { array, index } => {
                 let array = self.eval(env, array)?;
                 let index = self.eval(env, index)?;
-                array.get_item(index, expr.span)
+                array.get_item(index).err_at(expr.span)
             }
             ExprKind::Binary {
                 op,
@@ -323,17 +314,17 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
                 let left = self.eval(env, left)?;
                 let right = self.eval(env, right)?;
                 match op {
-                    BinaryOp::Add => left.add(&right, *op_span),
-                    BinaryOp::Sub => left.sub(&right, *op_span),
-                    BinaryOp::Mul => left.mul(&right, *op_span),
-                    BinaryOp::Div => left.div(&right, *op_span),
-                    BinaryOp::Mod => left.rem(&right, *op_span),
-                    BinaryOp::Eq => left.eq(&right, *op_span),
-                    BinaryOp::Ne => left.ne(&right, *op_span),
-                    BinaryOp::Ge => left.ge(&right, *op_span),
-                    BinaryOp::Gt => left.gt(&right, *op_span),
-                    BinaryOp::Le => left.le(&right, *op_span),
-                    BinaryOp::Lt => left.lt(&right, *op_span),
+                    BinaryOp::Add => left.add(&right).err_at(*op_span),
+                    BinaryOp::Sub => left.sub(&right).err_at(*op_span),
+                    BinaryOp::Mul => left.mul(&right).err_at(*op_span),
+                    BinaryOp::Div => left.div(&right).err_at(*op_span),
+                    BinaryOp::Mod => left.rem(&right).err_at(*op_span),
+                    BinaryOp::Eq => left.eq(&right).err_at(*op_span),
+                    BinaryOp::Ne => left.ne(&right).err_at(*op_span),
+                    BinaryOp::Ge => left.ge(&right).err_at(*op_span),
+                    BinaryOp::Gt => left.gt(&right).err_at(*op_span),
+                    BinaryOp::Le => left.le(&right).err_at(*op_span),
+                    BinaryOp::Lt => left.lt(&right).err_at(*op_span),
                 }
             }
             ExprKind::BoolLiteral(value) => Ok(Value::from_bool(*value)),
@@ -376,26 +367,31 @@ impl<'ctx, W: Write> Interpreter<'ctx, W> {
             ExprKind::Unary { op, op_span, expr } => {
                 let val = self.eval(env, expr)?;
                 match op {
-                    UnaryOp::Neg => val.negate(*op_span),
-                    UnaryOp::Not => val.not(*op_span),
+                    UnaryOp::Neg => val.negate().err_at(*op_span),
+                    UnaryOp::Not => val.not().err_at(*op_span),
                 }
             }
-            ExprKind::Var(name) => match env.lookup(name) {
-                Some(val) => Ok(val),
-                None => err_at(
-                    expr.span,
-                    format!("undeclared variable {:?}", self.ctx.interner.resolve(*name)),
-                ),
-            },
+            ExprKind::Var(name) => env.lookup(self.ctx, name).err_at(expr.span),
         }
     }
 
-    fn eval_bool(&mut self, env: &Rc<Env>, expr: &Expr) -> NxResult<bool> {
+    fn eval_bool(&mut self, env: &Rc<Env>, expr: &Expr) -> SourceResult<bool> {
         let value = self.eval(env, expr)?;
         if value.get_type() != ValueType::Bool {
             err_at(expr.span, "expected a boolean value")
         } else {
             Ok(value.unwrap_bool())
         }
+    }
+}
+
+fn err_at<T>(span: Span, message: impl Into<Box<str>>) -> SourceResult<T> {
+    Err(error_at(span, message))
+}
+
+fn error_at(span: Span, message: impl Into<Box<str>>) -> SourceError {
+    SourceError {
+        message: message.into(),
+        span,
     }
 }

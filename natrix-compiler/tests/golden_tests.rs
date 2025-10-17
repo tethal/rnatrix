@@ -1,7 +1,7 @@
-use natrix_core::ast_interpreter::Interpreter;
-use natrix_core::ctx::CompilerContext;
-use natrix_core::parser::parse;
-use natrix_core::token::{TokenType, Tokenizer};
+use natrix_compiler::ast::interpreter::Interpreter;
+use natrix_compiler::ctx::CompilerContext;
+use natrix_compiler::parser::parse;
+use natrix_compiler::token::{TokenType, Tokenizer};
 use std::fmt::Write;
 use std::path::Path;
 use test_utils::{datatest_stable, run_golden_test};

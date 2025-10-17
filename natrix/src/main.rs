@@ -1,10 +1,10 @@
-use natrix_core::ast_interpreter::Interpreter;
-use natrix_core::ctx::CompilerContext;
-use natrix_core::error::NxResult;
-use natrix_core::parser::parse;
-use natrix_core::value::Value;
+use natrix_compiler::ast::interpreter::Interpreter;
+use natrix_compiler::ctx::CompilerContext;
+use natrix_compiler::error::SourceResult;
+use natrix_compiler::parser::parse;
+use natrix_runtime::value::Value;
 
-fn parse_and_eval(ctx: &mut CompilerContext, src: &str, arg: i64) -> NxResult<Value> {
+fn parse_and_eval(ctx: &mut CompilerContext, src: &str, arg: i64) -> SourceResult<Value> {
     let source_id = ctx
         .sources
         .add_from_file(src)

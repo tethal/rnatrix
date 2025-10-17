@@ -1,5 +1,4 @@
-use crate::error::{err_at, error_at, NxResult};
-use crate::src::Span;
+use crate::nx_err::{nx_err, nx_error, NxResult};
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
@@ -201,25 +200,22 @@ impl Value {
         }
     }
 
-    fn check_numeric_operands(&self, other: &Value, op: &str, op_span: Span) -> NxResult<()> {
+    fn check_numeric_operands(&self, other: &Value, op: &str) -> NxResult<()> {
         if self.is_numeric() && other.is_numeric() {
             Ok(())
         } else {
-            err_at(
-                op_span,
-                format!(
-                    "operator {} cannot be applied to {:?} and {:?}",
-                    op,
-                    self.get_type(),
-                    other.get_type()
-                ),
-            )
+            nx_err(format!(
+                "operator {} cannot be applied to {:?} and {:?}",
+                op,
+                self.get_type(),
+                other.get_type()
+            ))
         }
     }
 
     // Arithmetic operators
 
-    pub fn add(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+    pub fn add(&self, other: &Value) -> NxResult<Value> {
         // String concatenation
         if self.is_string() && other.is_string() {
             let concatenated = format!("{}{}", self.string_ref(), other.string_ref());
@@ -236,7 +232,7 @@ impl Value {
             return Ok(Value::from_list(Rc::new(RefCell::new(result))));
         }
 
-        self.check_numeric_operands(other, "+", op_span)?;
+        self.check_numeric_operands(other, "+")?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
             Ok(Value::from_int(l.wrapping_add(r)))
@@ -245,8 +241,8 @@ impl Value {
         }
     }
 
-    pub fn sub(&self, other: &Value, op_span: Span) -> NxResult<Value> {
-        self.check_numeric_operands(other, "-", op_span)?;
+    pub fn sub(&self, other: &Value) -> NxResult<Value> {
+        self.check_numeric_operands(other, "-")?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
             Ok(Value::from_int(l.wrapping_sub(r)))
@@ -255,13 +251,13 @@ impl Value {
         }
     }
 
-    pub fn mul(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+    pub fn mul(&self, other: &Value) -> NxResult<Value> {
         // String repetition
         if self.is_string() && other.is_int() {
             let s = self.string_ref();
             let cnt = other.unwrap_int();
             if cnt < 0 {
-                return err_at(op_span, "string repetition count cannot be negative");
+                return nx_err("string repetition count cannot be negative");
             }
             let cnt = cnt as usize;
 
@@ -269,7 +265,7 @@ impl Value {
             let new_len = s
                 .len()
                 .checked_mul(cnt)
-                .ok_or_else(|| error_at(op_span, "string repetition result too large"))?;
+                .ok_or_else(|| nx_error("string repetition result too large"))?;
 
             let mut result = String::with_capacity(new_len);
             for _ in 0..cnt {
@@ -278,16 +274,12 @@ impl Value {
             return Ok(Value::from_string(result.into()));
         }
 
-        if self.is_int() && other.is_string() {
-            return other.mul(self, op_span);
-        }
-
         // List repetition
         if self.is_list() && other.is_int() {
             let l = self.list_ref().borrow();
             let cnt = other.unwrap_int();
             if cnt < 0 {
-                return err_at(op_span, "list repetition count cannot be negative");
+                return nx_err("list repetition count cannot be negative");
             }
             let cnt = cnt as usize;
 
@@ -295,7 +287,7 @@ impl Value {
             let new_len = l
                 .len()
                 .checked_mul(cnt)
-                .ok_or_else(|| error_at(op_span, "list repetition result too large"))?;
+                .ok_or_else(|| nx_error("list repetition result too large"))?;
 
             let mut result = Vec::with_capacity(new_len);
             for _ in 0..cnt {
@@ -305,10 +297,10 @@ impl Value {
         }
 
         if self.is_int() && (other.is_string() || other.is_list()) {
-            return other.mul(self, op_span);
+            return other.mul(self);
         }
 
-        self.check_numeric_operands(other, "*", op_span)?;
+        self.check_numeric_operands(other, "*")?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
             Ok(Value::from_int(l.wrapping_mul(r)))
@@ -317,12 +309,12 @@ impl Value {
         }
     }
 
-    pub fn div(&self, other: &Value, op_span: Span) -> NxResult<Value> {
-        self.check_numeric_operands(other, "/", op_span)?;
+    pub fn div(&self, other: &Value) -> NxResult<Value> {
+        self.check_numeric_operands(other, "/")?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
             if r == 0 {
-                return err_at(op_span, "division by zero");
+                return nx_err("division by zero");
             }
             Ok(Value::from_int(l.wrapping_div(r)))
         } else {
@@ -330,12 +322,12 @@ impl Value {
         }
     }
 
-    pub fn rem(&self, other: &Value, op_span: Span) -> NxResult<Value> {
-        self.check_numeric_operands(other, "%", op_span)?;
+    pub fn rem(&self, other: &Value) -> NxResult<Value> {
+        self.check_numeric_operands(other, "%")?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
             if r == 0 {
-                return err_at(op_span, "division by zero");
+                return nx_err("division by zero");
             }
             Ok(Value::from_int(l.wrapping_rem(r)))
         } else {
@@ -345,7 +337,7 @@ impl Value {
 
     // Comparison operators
 
-    pub fn eq(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+    pub fn eq(&self, other: &Value) -> NxResult<Value> {
         // Strings
         if self.is_string() && other.is_string() {
             return Ok(Value::from_bool(self.string_ref() == other.string_ref()));
@@ -361,7 +353,7 @@ impl Value {
             }
 
             for (e1, e2) in v1.iter().zip(v2.iter()) {
-                if !e1.eq(e2, op_span)?.unwrap_bool() {
+                if !e1.eq(e2)?.unwrap_bool() {
                     return Ok(Value::FALSE);
                 }
             }
@@ -394,17 +386,16 @@ impl Value {
         Ok(Value::from_bool(false))
     }
 
-    pub fn ne(&self, other: &Value, op_span: Span) -> NxResult<Value> {
-        self.eq(other, op_span)
-            .map(|v| Value::from_bool(!v.unwrap_bool()))
+    pub fn ne(&self, other: &Value) -> NxResult<Value> {
+        self.eq(other).map(|v| Value::from_bool(!v.unwrap_bool()))
     }
 
-    pub fn lt(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+    pub fn lt(&self, other: &Value) -> NxResult<Value> {
         if self.is_string() && other.is_string() {
             return Ok(Value::from_bool(self.string_ref() < other.string_ref()));
         }
 
-        self.check_numeric_operands(other, "<", op_span)?;
+        self.check_numeric_operands(other, "<")?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
             Ok(Value::from_bool(l < r))
@@ -413,12 +404,12 @@ impl Value {
         }
     }
 
-    pub fn le(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+    pub fn le(&self, other: &Value) -> NxResult<Value> {
         if self.is_string() && other.is_string() {
             return Ok(Value::from_bool(self.string_ref() <= other.string_ref()));
         }
 
-        self.check_numeric_operands(other, "<=", op_span)?;
+        self.check_numeric_operands(other, "<=")?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
             Ok(Value::from_bool(l <= r))
@@ -427,12 +418,12 @@ impl Value {
         }
     }
 
-    pub fn gt(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+    pub fn gt(&self, other: &Value) -> NxResult<Value> {
         if self.is_string() && other.is_string() {
             return Ok(Value::from_bool(self.string_ref() > other.string_ref()));
         }
 
-        self.check_numeric_operands(other, ">", op_span)?;
+        self.check_numeric_operands(other, ">")?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
             Ok(Value::from_bool(l > r))
@@ -441,12 +432,12 @@ impl Value {
         }
     }
 
-    pub fn ge(&self, other: &Value, op_span: Span) -> NxResult<Value> {
+    pub fn ge(&self, other: &Value) -> NxResult<Value> {
         if self.is_string() && other.is_string() {
             return Ok(Value::from_bool(self.string_ref() >= other.string_ref()));
         }
 
-        self.check_numeric_operands(other, ">=", op_span)?;
+        self.check_numeric_operands(other, ">=")?;
 
         if let Some((l, r)) = self.as_i64_pair(other) {
             Ok(Value::from_bool(l >= r))
@@ -457,28 +448,22 @@ impl Value {
 
     // Unary operators
 
-    pub fn negate(&self, op_span: Span) -> NxResult<Value> {
+    pub fn negate(&self) -> NxResult<Value> {
         match self.get_type() {
             ValueType::Int => Ok(Value::from_int(self.unwrap_int().wrapping_neg())),
             ValueType::Float => Ok(Value::from_float(-self.unwrap_float())),
-            t => err_at(
-                op_span,
-                format!("unary negation cannot be applied to {:?}", t),
-            ),
+            t => nx_err(format!("unary negation cannot be applied to {:?}", t)),
         }
     }
 
-    pub fn not(&self, op_span: Span) -> NxResult<Value> {
+    pub fn not(&self) -> NxResult<Value> {
         if self.is_bool() {
             Ok(Value::from_bool(!self.unwrap_bool()))
         } else {
-            err_at(
-                op_span,
-                format!(
-                    "logical negation cannot be applied to {:?}",
-                    self.get_type()
-                ),
-            )
+            nx_err(format!(
+                "logical negation cannot be applied to {:?}",
+                self.get_type()
+            ))
         }
     }
 
@@ -487,25 +472,22 @@ impl Value {
         Value::from_string(format!("{}", self).into())
     }
 
-    pub fn len(&self, span: Span) -> NxResult<Value> {
+    pub fn len(&self) -> NxResult<Value> {
         match &self.0 {
             ValueImpl::String(s) => Ok(Value::from_int(s.len() as i64)),
             ValueImpl::List(l) => Ok(Value::from_int(l.borrow().len() as i64)),
-            _ => err_at(
-                span,
-                format!("len cannot be applied to {:?}", self.get_type()),
-            ),
+            _ => nx_err(format!("len cannot be applied to {:?}", self.get_type())),
         }
     }
 
-    pub fn get_item(&self, index: Value, span: Span) -> NxResult<Value> {
+    pub fn get_item(&self, index: Value) -> NxResult<Value> {
         if !index.is_int() {
-            return err_at(span, "index must be an integer");
+            return nx_err("index must be an integer");
         }
 
         let idx = index.unwrap_int();
         if idx < 0 {
-            return err_at(span, "index cannot be negative");
+            return nx_err("index cannot be negative");
         }
         let idx = idx as usize;
 
@@ -513,7 +495,7 @@ impl Value {
             let list = self.list_ref().borrow();
             return match list.get(idx) {
                 Some(v) => Ok(v.clone()),
-                None => err_at(span, "list index out of bounds"),
+                None => nx_err("list index out of bounds"),
             };
         }
 
@@ -521,21 +503,21 @@ impl Value {
             let string = self.string_ref();
             return match string.as_bytes().get(idx) {
                 Some(&byte) => Ok(Value::from_int(byte as i64)),
-                None => err_at(span, "string index out of bounds"),
+                None => nx_err("string index out of bounds"),
             };
         }
 
-        err_at(span, "only lists and strings support indexing")
+        nx_err("only lists and strings support indexing")
     }
 
-    pub fn set_item(&self, index: Value, value: Value, span: Span) -> NxResult<()> {
+    pub fn set_item(&self, index: Value, value: Value) -> NxResult<()> {
         if !index.is_int() {
-            return err_at(span, "index must be an integer");
+            return nx_err("index must be an integer");
         }
 
         let idx = index.unwrap_int();
         if idx < 0 {
-            return err_at(span, "index cannot be negative");
+            return nx_err("index cannot be negative");
         }
         let idx = idx as usize;
 
@@ -546,39 +528,33 @@ impl Value {
                     *v = value;
                     Ok(())
                 }
-                None => err_at(span, "list index out of bounds"),
+                None => nx_err("list index out of bounds"),
             };
         }
 
-        err_at(span, "only lists support indexing in assignments")
+        nx_err("only lists support indexing in assignments")
     }
 
-    pub fn int(&self, span: Span) -> NxResult<Value> {
+    pub fn int(&self) -> NxResult<Value> {
         match &self.0 {
             ValueImpl::Int(i) => Ok(Value::from_int(*i)),
             // Truncates towards zero, saturates on overflow, NaN → 0
             ValueImpl::Float(f) => Ok(Value::from_int(*f as i64)),
             ValueImpl::String(s) => Ok(Value::from_int(
-                i64::from_str(s).map_err(|e| error_at(span, e.to_string()))?,
+                i64::from_str(s).map_err(|e| nx_error(e.to_string()))?,
             )),
-            _ => err_at(
-                span,
-                format!("int cannot be applied to {:?}", self.get_type()),
-            ),
+            _ => nx_err(format!("int cannot be applied to {:?}", self.get_type())),
         }
     }
 
-    pub fn float(&self, span: Span) -> NxResult<Value> {
+    pub fn float(&self) -> NxResult<Value> {
         match &self.0 {
             ValueImpl::Int(i) => Ok(Value::from_float(*i as f64)),
             ValueImpl::Float(f) => Ok(Value::from_float(*f)),
             ValueImpl::String(s) => Ok(Value::from_float(
-                f64::from_str(s).map_err(|e| error_at(span, e.to_string()))?,
+                f64::from_str(s).map_err(|e| nx_error(e.to_string()))?,
             )),
-            _ => err_at(
-                span,
-                format!("float cannot be applied to {:?}", self.get_type()),
-            ),
+            _ => nx_err(format!("float cannot be applied to {:?}", self.get_type())),
         }
     }
 }

@@ -1,0 +1,3 @@
+<string>:2:5: error: built-in function cannot be assigned to
+    print = 42;
+    ^^^^^

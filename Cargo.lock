@@ -191,15 +191,21 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 name = "natrix"
 version = "0.1.0"
 dependencies = [
- "natrix-core",
+ "natrix-compiler",
+ "natrix-runtime",
 ]
 
 [[package]]
-name = "natrix-core"
+name = "natrix-compiler"
 version = "0.1.0"
 dependencies = [
+ "natrix-runtime",
  "test-utils",
 ]
+
+[[package]]
+name = "natrix-runtime"
+version = "0.1.0"
 
 [[package]]
 name = "once_cell_polyfill"

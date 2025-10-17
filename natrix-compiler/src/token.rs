@@ -1,5 +1,5 @@
 use crate::ctx::{CompilerContext, Interner, Name};
-use crate::error::{err_at, NxResult};
+use crate::error::{SourceError, SourceResult};
 use crate::src::{Cursor, SourceId, Span};
 pub use crate::token_type::TokenType;
 
@@ -23,7 +23,7 @@ impl<'ctx> Tokenizer<'ctx> {
         }
     }
 
-    pub fn next_token(&mut self) -> NxResult<Token> {
+    pub fn next_token(&mut self) -> SourceResult<Token> {
         loop {
             self.cursor.mark();
             let tt = self.parse_token_type()?;
@@ -55,7 +55,7 @@ impl<'ctx> Tokenizer<'ctx> {
         self.cursor.lexeme(token.span)
     }
 
-    fn parse_token_type(&mut self) -> NxResult<TokenType> {
+    fn parse_token_type(&mut self) -> SourceResult<TokenType> {
         match self.cursor.advance() {
             Some(c) if c.is_whitespace() => self.do_whitespace(),
             Some(c) if c.is_ascii_digit() => self.do_number(),
@@ -89,7 +89,7 @@ impl<'ctx> Tokenizer<'ctx> {
                     self.cursor.advance();
                     Ok(TokenType::Or)
                 } else {
-                    err_at(self.cursor.span_from_mark(), "bitwise or not supported")
+                    self.err("bitwise or not supported")
                 }
             }
             Some('&') => {
@@ -97,16 +97,13 @@ impl<'ctx> Tokenizer<'ctx> {
                     self.cursor.advance();
                     Ok(TokenType::And)
                 } else {
-                    err_at(self.cursor.span_from_mark(), "bitwise and not supported")
+                    self.err("bitwise and not supported")
                 }
             }
             Some(',') => Ok(TokenType::Comma),
             Some(';') => Ok(TokenType::Semicolon),
             Some('"') => self.do_string_literal(),
-            Some(c) => err_at(
-                self.cursor.span_from_mark(),
-                format!("unexpected character {:?}", c),
-            ),
+            Some(c) => self.err(format!("unexpected character {:?}", c)),
             None => Ok(TokenType::Eof),
         }
     }
@@ -116,7 +113,7 @@ impl<'ctx> Tokenizer<'ctx> {
         second_char: char,
         one_char: TokenType,
         two_char: TokenType,
-    ) -> NxResult<TokenType> {
+    ) -> SourceResult<TokenType> {
         if self.cursor.peek() == Some(second_char) {
             self.cursor.advance();
             Ok(two_char)
@@ -125,24 +122,21 @@ impl<'ctx> Tokenizer<'ctx> {
         }
     }
 
-    fn do_whitespace(&mut self) -> NxResult<TokenType> {
+    fn do_whitespace(&mut self) -> SourceResult<TokenType> {
         while self.cursor.peek().is_some_and(|c| c.is_whitespace()) {
             self.cursor.advance();
         }
         Ok(TokenType::Whitespace)
     }
 
-    fn do_number(&mut self) -> NxResult<TokenType> {
+    fn do_number(&mut self) -> SourceResult<TokenType> {
         while self.cursor.peek().is_some_and(|c| c.is_ascii_digit()) {
             self.cursor.advance();
         }
         if self.cursor.peek() == Some('.') {
             self.cursor.advance();
             if !self.cursor.peek().is_some_and(|c| c.is_ascii_digit()) {
-                return err_at(
-                    self.cursor.span_from_mark(),
-                    "expected digit after decimal point",
-                );
+                return self.err("expected digit after decimal point");
             }
             while self.cursor.peek().is_some_and(|c| c.is_ascii_digit()) {
                 self.cursor.advance();
@@ -153,7 +147,7 @@ impl<'ctx> Tokenizer<'ctx> {
         }
     }
 
-    fn do_identifier(&mut self) -> NxResult<TokenType> {
+    fn do_identifier(&mut self) -> SourceResult<TokenType> {
         while self
             .cursor
             .peek()
@@ -164,18 +158,15 @@ impl<'ctx> Tokenizer<'ctx> {
         Ok(TokenType::Identifier)
     }
 
-    fn do_string_literal(&mut self) -> NxResult<TokenType> {
+    fn do_string_literal(&mut self) -> SourceResult<TokenType> {
         // Opening quote already consumed
         loop {
             match self.cursor.peek() {
                 None => {
-                    return err_at(self.cursor.span_from_mark(), "unterminated string literal");
+                    return self.err("unterminated string literal");
                 }
                 Some('\n') => {
-                    return err_at(
-                        self.cursor.span_from_mark(),
-                        "unterminated string literal (newline in string)",
-                    );
+                    return self.err("unterminated string literal (newline in string)");
                 }
                 Some('"') => {
                     self.cursor.advance(); // Consume closing quote
@@ -188,16 +179,10 @@ impl<'ctx> Tokenizer<'ctx> {
                             self.cursor.advance(); // Consume escape char
                         }
                         Some(c) => {
-                            return err_at(
-                                self.cursor.span_from_mark(),
-                                format!("unknown escape sequence: \\{}", c),
-                            );
+                            return self.err(format!("unknown escape sequence: \\{}", c));
                         }
                         None => {
-                            return err_at(
-                                self.cursor.span_from_mark(),
-                                "unterminated string literal (escape at end)",
-                            );
+                            return self.err("unterminated string literal (escape at end)");
                         }
                     }
                 }
@@ -205,6 +190,17 @@ impl<'ctx> Tokenizer<'ctx> {
                     self.cursor.advance(); // Regular character
                 }
             }
+        }
+    }
+
+    fn err<T>(&self, message: impl Into<Box<str>>) -> SourceResult<T> {
+        Err(self.error(message))
+    }
+
+    fn error(&self, message: impl Into<Box<str>>) -> SourceError {
+        SourceError {
+            message: message.into(),
+            span: self.cursor.span_from_mark(),
         }
     }
 }
