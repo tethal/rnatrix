@@ -1,10 +1,7 @@
 Program @<string>:9:1-1
   FunDecl("f1") @<string>:1:5-7
-    Block @<string>:1-10:2-2
   FunDecl("f2") @<string>:4:5-7
     Param("arg1") @<string>:4:8-12
-    Block @<string>:4-14:5-2
   FunDecl("f3") @<string>:7:5-7
     Param("arg1") @<string>:7:8-12
     Param("arg2") @<string>:7:14-18
-    Block @<string>:7-20:8-2

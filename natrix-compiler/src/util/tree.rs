@@ -73,6 +73,7 @@ macro_rules! def_formatter {
                 self.end_header(f, span)
             }
 
+            #[allow(dead_code)]
             pub fn header_with_name(
                 &self,
                 f: &mut Formatter<'_>,
@@ -87,6 +88,7 @@ macro_rules! def_formatter {
                 self.end_header(f, span)
             }
 
+            #[allow(dead_code)]
             pub fn property_with_span<T: Debug>(
                 &self,
                 f: &mut Formatter<'_>,
@@ -99,6 +101,7 @@ macro_rules! def_formatter {
                 writeln!(f)
             }
 
+            #[allow(dead_code)]
             pub fn property_name_with_span(
                 &self,
                 f: &mut Formatter<'_>,

@@ -2,9 +2,7 @@ use crate::ctx::Name;
 use crate::src::Span;
 use crate::util::tree::def_node;
 pub use interpreter::Interpreter;
-use natrix_runtime::nx_err::NxResult;
-use natrix_runtime::value::Value;
-use std::fmt::Debug;
+use natrix_runtime::value::{BinaryOp, UnaryOp};
 use std::rc::Rc;
 
 mod debug;
@@ -19,7 +17,7 @@ def_node!(FunDecl {
     name: Name,
     name_span: Span,
     params: Vec<Param>,
-    body: Stmt,
+    body: Vec<Stmt>,
 });
 
 def_node!(Param {
@@ -107,52 +105,4 @@ pub enum StmtKind {
         cond: Expr,
         body: Box<Stmt>,
     },
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum BinaryOp {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    Eq,
-    Ne,
-    Lt,
-    Le,
-    Gt,
-    Ge,
-}
-
-impl BinaryOp {
-    pub fn eval(&self, left: &Value, right: &Value) -> NxResult<Value> {
-        match self {
-            BinaryOp::Add => left.add(&right),
-            BinaryOp::Sub => left.sub(&right),
-            BinaryOp::Mul => left.mul(&right),
-            BinaryOp::Div => left.div(&right),
-            BinaryOp::Mod => left.rem(&right),
-            BinaryOp::Eq => left.eq(&right),
-            BinaryOp::Ne => left.ne(&right),
-            BinaryOp::Ge => left.ge(&right),
-            BinaryOp::Gt => left.gt(&right),
-            BinaryOp::Le => left.le(&right),
-            BinaryOp::Lt => left.lt(&right),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum UnaryOp {
-    Neg,
-    Not,
-}
-
-impl UnaryOp {
-    pub fn eval(&self, arg: &Value) -> NxResult<Value> {
-        match self {
-            UnaryOp::Neg => arg.negate(),
-            UnaryOp::Not => arg.not(),
-        }
-    }
 }

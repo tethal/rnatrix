@@ -53,12 +53,11 @@ See [[README]] for project overview and design decisions.
 
 **1. HIR Infrastructure**
 
-- [ ] Define HIR types (`hir::Expr`, `hir::Stmt`, `hir::Program`)
-- [ ] Define `VarRef` enum (Local/Global/Builtin with IDs)
-- [ ] Define symbol table types (`LocalId`, `GlobalId`, `SymbolTable`, `LocalInfo`, `GlobalInfo`)
-- [ ] Build analyzer module: scope resolution, symbol table construction
-- [ ] Entry point: `analyze(ast: &ast::Program) -> SourceResult<hir::Program>`
-- [ ] Test: Simple programs compile to HIR with correct symbol resolution
+- [X] Define HIR types (`hir::Expr`, `hir::Stmt`, `hir::Program`)
+- [X] Define symbol types (`LocalId`, `GlobalId`, `LocalInfo`, `GlobalInfo`)
+- [X] Build analyzer module: scope resolution, symbol table construction
+- [X] Entry point: `analyze(ast: &ast::Program) -> SourceResult<hir::Program>`
+- [X] Test: Simple programs compile to HIR with correct symbol resolution
 
 **2. Sample optimization Pass**
 
@@ -75,17 +74,17 @@ See [[README]] for project overview and design decisions.
 
 **4. Simple Bytecode Compiler + VM (minimal language subset)**
 
-- **Language subset:** integers, bools, null, arithmetic, comparisons, single function (no arguments), return
+- **Language subset:** integers, bools, null, arithmetic, variables, single function (no arguments), return
 - [ ] Compiler: HIR → BytecodeBuilder for expressions and return statements
 - [ ] VM: Stack machine with value stack (`Vec<Value>`)
 - [ ] VM: Instruction dispatch loop for basic opcodes (push, arithmetic, comparisons, ret)
 - [ ] Entry point: `execute(bytecode: Bytecode) -> Result<Value>`
 - [ ] Test: `fn main() { return 2 + 3; }` compiles and executes correctly
 
-**5. Variables and Control Flow**
+**5. Control Flow**
 
-- **Add to language:** local variables, if/else, while, break/continue
-- [ ] Compiler: Variable load/store instructions, jump label tracking
+- **Add to language:** if/else, while, break/continue
+- [ ] Compiler: Jump label tracking
 - [ ] Compiler: Conditional jumps (jtrue/jfalse), unconditional jumps (jmp)
 - [ ] VM: Jump instructions (update instruction pointer)
 - [ ] Test: Loops, conditionals, local variable manipulation

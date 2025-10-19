@@ -29,7 +29,10 @@ impl<'a> Debug for FunDeclDebug<'a> {
         for p in self.fun_decl.params.iter() {
             self.fmt.param(f, p)?
         }
-        self.fmt.stmt(f, &self.fun_decl.body)
+        for stmt in &self.fun_decl.body {
+            self.fmt.stmt(f, stmt)?;
+        }
+        Ok(())
     }
 }
 

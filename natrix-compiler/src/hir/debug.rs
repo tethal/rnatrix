@@ -1,0 +1,136 @@
+use crate::ctx::{CompilerContext, Name};
+use crate::hir::{
+    Expr, ExprKind, Function, GlobalInfo, GlobalKind, LocalInfo, LocalKind, Program, Stmt, StmtKind,
+};
+use crate::src::Span;
+use crate::util::tree::{def_formatter, impl_node_debug};
+use std::fmt;
+use std::fmt::{Debug, Formatter};
+
+def_formatter!(HirFormatter);
+
+impl_node_debug!(Program as program => ProgramDebug HirFormatter);
+
+impl<'a> Debug for ProgramDebug<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt.header(f, "Program", self.program.span)?;
+        for g in self.program.globals.iter() {
+            self.fmt.global(f, g)?
+        }
+        Ok(())
+    }
+}
+
+impl_node_debug!(GlobalInfo as global => GlobalInfoDebug HirFormatter);
+
+impl<'a> Debug for GlobalInfoDebug<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{:?}: ", self.fmt.indent_str(), self.global.id)?;
+        self.fmt.name(f, self.global.name)?;
+        self.fmt.span(f, self.global.name_span)?;
+        write!(f, "\n")?;
+        match &self.global.kind {
+            GlobalKind::Function(function) => self.fmt.function(f, function),
+        }
+    }
+}
+
+impl_node_debug!(Function as function => FunctionDebug HirFormatter);
+
+impl<'a> Debug for FunctionDebug<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}Function:\n", self.fmt.indent_str())?;
+        for l in self.function.locals.iter() {
+            self.fmt.local(f, l)?
+        }
+        for stmt in &self.function.body {
+            self.fmt.stmt(f, stmt)?;
+        }
+        Ok(())
+    }
+}
+
+impl_node_debug!(LocalInfo as local => LocalInfoDebug HirFormatter);
+
+impl<'a> Debug for LocalInfoDebug<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{:?}: ", self.fmt.indent_str(), self.local.id)?;
+        self.fmt.name(f, self.local.name)?;
+        write!(f, " ")?;
+        match &self.local.kind {
+            LocalKind::Parameter(index) => write!(f, "Param#{:?}", index)?,
+            LocalKind::LocalVariable => write!(f, "LocalVariable")?,
+        }
+        self.fmt.span(f, self.local.name_span)?;
+        write!(f, "\n")
+    }
+}
+
+impl_node_debug!(Stmt as stmt => StmtDebug HirFormatter);
+
+impl<'a> Debug for StmtDebug<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let span = self.stmt.span;
+        match &self.stmt.kind {
+            StmtKind::Block(stmts) => {
+                self.fmt.header(f, "Block", span)?;
+                for stmt in stmts {
+                    self.fmt.stmt(f, stmt)?;
+                }
+                Ok(())
+            }
+            StmtKind::Expr(expr) => {
+                self.fmt.header(f, "Expr", span)?;
+                self.fmt.expr(f, expr)
+            }
+            StmtKind::Return(expr) => {
+                self.fmt.header(f, "Return", span)?;
+                self.fmt.expr(f, expr)
+            }
+            StmtKind::StoreGlobal(id, value) => {
+                self.fmt.header_with_value(f, "StoreGlobal", span, id)?;
+                self.fmt.expr(f, value)
+            }
+            StmtKind::StoreLocal(id, value) => {
+                self.fmt.header_with_value(f, "StoreLocal", span, id)?;
+                self.fmt.expr(f, value)
+            }
+            StmtKind::VarDecl(id, value) => {
+                self.fmt.header_with_value(f, "VarDecl", span, id)?;
+                self.fmt.expr(f, value)
+            }
+        }
+    }
+}
+
+impl_node_debug!(Expr as expr => ExprDebug HirFormatter);
+
+impl<'a> Debug for ExprDebug<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let span = self.expr.span;
+        match &self.expr.kind {
+            ExprKind::Binary {
+                op,
+                op_span,
+                left,
+                right,
+            } => {
+                self.fmt.header_with_value(f, "Binary", *op_span, *op)?;
+                self.fmt.expr(f, left)?;
+                self.fmt.expr(f, right)
+            }
+            ExprKind::ConstBool(value) => self.fmt.header_with_value(f, "ConstBool", span, value),
+            ExprKind::ConstInt(value) => self.fmt.header_with_value(f, "ConstInt", span, value),
+            ExprKind::ConstNull => self.fmt.header(f, "ConstNull", span),
+            ExprKind::LoadBuiltin(builtin) => {
+                self.fmt.header_with_value(f, "LoadBuiltin", span, builtin)
+            }
+            ExprKind::LoadGlobal(id) => self.fmt.header_with_value(f, "LoadGlobal", span, id),
+            ExprKind::LoadLocal(id) => self.fmt.header_with_value(f, "LoadLocal", span, id),
+            ExprKind::Unary { op, op_span, expr } => {
+                self.fmt.header_with_value(f, "Unary", *op_span, *op)?;
+                self.fmt.expr(f, expr)
+            }
+        }
+    }
+}

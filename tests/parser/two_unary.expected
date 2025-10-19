@@ -1,9 +1,8 @@
 Program @<string>:4:1-1
   FunDecl("main") @<string>:1:5-9
-    Block @<string>:1-12:3-2
-      Expr @<string>:2:5-8
-        Unary @<string>:2:5-8
-          op: Not @<string>:2:5-6
-          Unary @<string>:2:6-8
-            op: Not @<string>:2:6-7
-            Var("a") @<string>:2:7-8
+    Expr @<string>:2:5-8
+      Unary @<string>:2:5-8
+        op: Not @<string>:2:5-6
+        Unary @<string>:2:6-8
+          op: Not @<string>:2:6-7
+          Var("a") @<string>:2:7-8

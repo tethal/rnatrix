@@ -25,10 +25,13 @@ struct Env {
 }
 
 impl Env {
-    fn new_root(ctx: &mut CompilerContext) -> Rc<Env> {
+    fn new_root(ctx: &CompilerContext) -> Rc<Env> {
         let mut vars: HashMap<Name, Value> = HashMap::new();
         for builtin in Builtin::ALL {
-            Env::define_builtin(ctx, &mut vars, builtin);
+            vars.insert(
+                ctx.interner.lookup(builtin.name()).unwrap(),
+                Value::from_function(Rc::new(builtin.as_function_object())),
+            );
         }
         let env = Rc::new(Env {
             vars: RefCell::new(vars),
@@ -43,22 +46,6 @@ impl Env {
             vars: RefCell::new(HashMap::new()),
             parent: Some(parent),
         })
-    }
-
-    fn define_builtin(
-        ctx: &mut CompilerContext,
-        vars: &mut HashMap<Name, Value>,
-        builtin: &Builtin,
-    ) {
-        vars.insert(
-            ctx.interner.intern(builtin.name()),
-            Value::from_function(Rc::new(FunctionObject {
-                name: builtin.name().into(),
-                arity: builtin.arity(),
-                num_locals: 0,
-                code_handle: builtin.as_code_handle(),
-            })),
-        );
     }
 
     fn lookup(&self, ctx: &CompilerContext, name: &Name) -> NxResult<Value> {
@@ -115,7 +102,7 @@ pub struct Interpreter<'ctx> {
 }
 
 impl<'ctx> Interpreter<'ctx> {
-    pub fn new(ctx: &'ctx mut CompilerContext, rt: &'ctx mut Runtime) -> Self {
+    pub fn new(ctx: &'ctx CompilerContext, rt: &'ctx mut Runtime) -> Self {
         let globals = Env::new_root(ctx);
         Self {
             ctx,
@@ -184,12 +171,23 @@ impl<'ctx> Interpreter<'ctx> {
             env.declare(self.ctx, param.name, arg)
                 .err_at(param.name_span)?;
         }
-        match self.do_stmt(&env, &fun_decl.body)? {
+        match self.do_block(&env, &fun_decl.body)? {
             StmtFlow::Next => Ok(Value::NULL),
             StmtFlow::Return(value) => Ok(value),
             StmtFlow::Break(span) => err_at(span, "break outside a loop"),
             StmtFlow::Continue(span) => err_at(span, "continue outside a loop"),
         }
+    }
+
+    fn do_block(&mut self, env: &Rc<Env>, stmts: &Vec<Stmt>) -> SourceResult<StmtFlow> {
+        let inner_env = Env::new(env.clone());
+        for stmt in stmts {
+            let flow = self.do_stmt(&inner_env, stmt)?;
+            if !matches!(flow, StmtFlow::Next) {
+                return Ok(flow);
+            }
+        }
+        Ok(StmtFlow::Next)
     }
 
     fn do_stmt(&mut self, env: &Rc<Env>, stmt: &Stmt) -> SourceResult<StmtFlow> {
@@ -209,16 +207,7 @@ impl<'ctx> Interpreter<'ctx> {
                 }
                 Ok(StmtFlow::Next)
             }
-            StmtKind::Block(stmts) => {
-                let inner_env = Env::new(env.clone());
-                for stmt in stmts {
-                    let flow = self.do_stmt(&inner_env, stmt)?;
-                    if !matches!(flow, StmtFlow::Next) {
-                        return Ok(flow);
-                    }
-                }
-                Ok(StmtFlow::Next)
-            }
+            StmtKind::Block(stmts) => self.do_block(env, &stmts),
             StmtKind::Break => Ok(StmtFlow::Break(stmt.span)),
             StmtKind::Continue => Ok(StmtFlow::Continue(stmt.span)),
             StmtKind::Expr(expr) => {

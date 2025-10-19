@@ -1,20 +1,19 @@
 Program @<string>:5:1-1
   FunDecl("main") @<string>:1:5-9
-    Block @<string>:1-12:4-2
-      Expr @<string>:2-5:3-13
-        Binary @<string>:2-5:3-13
-          op: Sub @<string>:3:6-7
-          Binary @<string>:2:5-21
-            op: Mul @<string>:2:13-14
-            Paren @<string>:2:5-12
-              Binary @<string>:2:6-11
-                op: Add @<string>:2:8-9
-                IntLiteral(1) @<string>:2:6-7
-                IntLiteral(2) @<string>:2:10-11
-            Unary @<string>:2:15-21
-              op: Neg @<string>:2:15-16
-              FloatLiteral(3.14) @<string>:2:17-21
-          Binary @<string>:3:8-13
-            op: Div @<string>:3:10-11
-            IntLiteral(4) @<string>:3:8-9
-            IntLiteral(5) @<string>:3:12-13
+    Expr @<string>:2-5:3-13
+      Binary @<string>:2-5:3-13
+        op: Sub @<string>:3:6-7
+        Binary @<string>:2:5-21
+          op: Mul @<string>:2:13-14
+          Paren @<string>:2:5-12
+            Binary @<string>:2:6-11
+              op: Add @<string>:2:8-9
+              IntLiteral(1) @<string>:2:6-7
+              IntLiteral(2) @<string>:2:10-11
+          Unary @<string>:2:15-21
+            op: Neg @<string>:2:15-16
+            FloatLiteral(3.14) @<string>:2:17-21
+        Binary @<string>:3:8-13
+          op: Div @<string>:3:10-11
+          IntLiteral(4) @<string>:3:8-9
+          IntLiteral(5) @<string>:3:12-13

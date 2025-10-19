@@ -1,11 +1,11 @@
 use crate::ast::{
-    AssignTarget, AssignTargetKind, BinaryOp, Expr, ExprKind, FunDecl, Param, Program, Stmt,
-    StmtKind, UnaryOp,
+    AssignTarget, AssignTargetKind, Expr, ExprKind, FunDecl, Param, Program, Stmt, StmtKind,
 };
 use crate::ctx::CompilerContext;
 use crate::error::{SourceError, SourceResult};
 use crate::src::{SourceId, Span};
 use crate::token::{Token, TokenType, Tokenizer};
+use natrix_runtime::value::{BinaryOp, UnaryOp};
 use std::str::FromStr;
 
 pub type ParseResult<T> = SourceResult<T>;
@@ -39,7 +39,7 @@ impl<'ctx> Parser<'ctx> {
         let name_span = self.span();
         let name = self.expect(TokenType::Identifier)?.name.unwrap();
         let params = self.params()?;
-        let body = self.block()?;
+        let (body, _) = self.block()?;
         Ok(FunDecl::new(name, name_span, params, body))
     }
 
@@ -65,7 +65,7 @@ impl<'ctx> Parser<'ctx> {
         Ok(Param::new(name, name_span))
     }
 
-    fn block(&mut self) -> ParseResult<Stmt> {
+    fn block(&mut self) -> ParseResult<(Vec<Stmt>, Span)> {
         let mut stmts = Vec::new();
         let start_span = self.expect(TokenType::LBrace)?.span;
         while self.tt() != TokenType::RBrace {
@@ -76,10 +76,7 @@ impl<'ctx> Parser<'ctx> {
             }
         }
         let end_span = self.expect(TokenType::RBrace)?.span;
-        Ok(Stmt::new(
-            StmtKind::Block(stmts),
-            start_span.extend_to(end_span),
-        ))
+        Ok((stmts, start_span.extend_to(end_span)))
     }
 
     fn var_decl(&mut self) -> ParseResult<Stmt> {
@@ -102,7 +99,10 @@ impl<'ctx> Parser<'ctx> {
 
     fn stmt(&mut self) -> ParseResult<Stmt> {
         match self.tt() {
-            TokenType::LBrace => self.block(),
+            TokenType::LBrace => {
+                let (stmts, span) = self.block()?;
+                Ok(Stmt::new(StmtKind::Block(stmts), span))
+            }
             TokenType::KwBreak => {
                 let span = self.consume()?.span;
                 let span = span.extend_to(self.expect(TokenType::Semicolon)?.span);

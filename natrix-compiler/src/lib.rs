@@ -1,6 +1,8 @@
+pub mod analyze;
 pub mod ast;
 pub mod ctx;
 pub mod error;
+pub mod hir;
 pub mod parser;
 pub mod src;
 pub mod token;

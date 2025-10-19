@@ -3,6 +3,27 @@ use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum BinaryOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum UnaryOp {
+    Neg,
+    Not,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueType {
     Null,
@@ -543,6 +564,33 @@ impl Display for Value {
             ValueImpl::Function(fun) => {
                 write!(f, "<function {} at {:#x}>", fun.name, fun.code_handle.0)
             }
+        }
+    }
+}
+
+impl BinaryOp {
+    pub fn eval(&self, left: &Value, right: &Value) -> NxResult<Value> {
+        match self {
+            BinaryOp::Add => left.add(&right),
+            BinaryOp::Sub => left.sub(&right),
+            BinaryOp::Mul => left.mul(&right),
+            BinaryOp::Div => left.div(&right),
+            BinaryOp::Mod => left.rem(&right),
+            BinaryOp::Eq => left.eq(&right),
+            BinaryOp::Ne => left.ne(&right),
+            BinaryOp::Ge => left.ge(&right),
+            BinaryOp::Gt => left.gt(&right),
+            BinaryOp::Le => left.le(&right),
+            BinaryOp::Lt => left.lt(&right),
+        }
+    }
+}
+
+impl UnaryOp {
+    pub fn eval(&self, arg: &Value) -> NxResult<Value> {
+        match self {
+            UnaryOp::Neg => arg.negate(),
+            UnaryOp::Not => arg.not(),
         }
     }
 }

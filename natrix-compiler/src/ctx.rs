@@ -1,5 +1,6 @@
 use crate::src::Sources;
 use crate::token_type::{TokenType, KEYWORDS};
+use natrix_runtime::runtime::Builtin;
 use std::collections::HashMap;
 use std::num::NonZeroU32;
 
@@ -11,9 +12,13 @@ pub struct CompilerContext {
 
 impl CompilerContext {
     pub fn new() -> Self {
+        let mut interner = Interner::new();
+        for builtin in Builtin::ALL {
+            interner.intern(builtin.name());
+        }
         Self {
             sources: Sources::new(),
-            interner: Interner::new(),
+            interner,
         }
     }
 }

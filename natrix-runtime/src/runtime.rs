@@ -1,5 +1,5 @@
 use crate::nx_err::{nx_err, nx_error, NxResult};
-use crate::value::{CodeHandle, Value, ValueType};
+use crate::value::{CodeHandle, FunctionObject, Value, ValueType};
 use std::fmt::Write;
 use std::str::FromStr;
 
@@ -30,6 +30,15 @@ macro_rules! define_builtins {
 
             pub fn as_code_handle(&self) -> CodeHandle {
                 CodeHandle(usize::MAX - *self as u8 as usize)
+            }
+
+            pub fn as_function_object(&self) -> FunctionObject {
+                FunctionObject {
+                    name: self.name().into(),
+                    arity: self.arity(),
+                    num_locals: 0,
+                    code_handle: self.as_code_handle(),
+                }
             }
 
             pub fn from_code_handle(code_handle: CodeHandle) -> Option<Self> {

@@ -1,3 +1,4 @@
+use natrix_compiler::analyze::analyze;
 use natrix_compiler::ast::Interpreter as AstInterpreter;
 use natrix_compiler::ctx::CompilerContext;
 use natrix_compiler::error::SourceResult;
@@ -10,12 +11,15 @@ fn parse_and_eval(ctx: &mut CompilerContext, src: &str, arg: i64) -> SourceResul
         .sources
         .add_from_file(src)
         .expect("Unable to load source file");
-    let program = parse(ctx, source_id)?;
-    println!("{:?}", program.debug_with(&ctx));
+    let ast = parse(ctx, source_id)?;
+    println!("{:?}", ast.debug_with(&ctx));
+
+    let hir = analyze(&ctx, &ast)?;
+    println!("{:?}", hir.debug_with(&ctx));
 
     let mut rt = Runtime::new();
     let mut interpreter = AstInterpreter::new(ctx, &mut rt);
-    interpreter.run(program, vec![Value::from_int(arg)])
+    interpreter.run(ast, vec![Value::from_int(arg)])
 }
 
 fn main() {
