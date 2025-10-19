@@ -28,6 +28,10 @@ macro_rules! define_builtins {
                 }
             }
 
+            pub fn index(&self) -> usize {
+                *self as u8 as usize
+            }
+
             pub fn as_code_handle(&self) -> CodeHandle {
                 CodeHandle(usize::MAX - *self as u8 as usize)
             }
@@ -35,8 +39,8 @@ macro_rules! define_builtins {
             pub fn as_function_object(&self) -> FunctionObject {
                 FunctionObject {
                     name: self.name().into(),
-                    arity: self.arity(),
-                    num_locals: 0,
+                    param_count: self.arity(),
+                    max_slots: 0,
                     code_handle: self.as_code_handle(),
                 }
             }

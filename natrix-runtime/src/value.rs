@@ -55,8 +55,8 @@ pub struct CodeHandle(pub usize);
 #[derive(Debug)]
 pub struct FunctionObject {
     pub name: Box<str>,
-    pub arity: usize,
-    pub num_locals: usize,
+    pub param_count: usize,
+    pub max_slots: usize, // includes parameters
     pub code_handle: CodeHandle,
 }
 

@@ -18,6 +18,7 @@ def_node!(FunDecl {
     name_span: Span,
     params: Vec<Param>,
     body: Vec<Stmt>,
+    body_span: Span,
 });
 
 def_node!(Param {

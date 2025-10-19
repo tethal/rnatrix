@@ -39,8 +39,8 @@ impl<'ctx> Parser<'ctx> {
         let name_span = self.span();
         let name = self.expect(TokenType::Identifier)?.name.unwrap();
         let params = self.params()?;
-        let (body, _) = self.block()?;
-        Ok(FunDecl::new(name, name_span, params, body))
+        let (body, body_span) = self.block()?;
+        Ok(FunDecl::new(name, name_span, params, body, body_span))
     }
 
     fn params(&mut self) -> SourceResult<Vec<Param>> {

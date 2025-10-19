@@ -100,9 +100,9 @@ String comparisons use lexicographic ordering. Numeric comparisons work across i
 
 | Opcode         | Immediates | Stack Effect        | Description                         |
 |----------------|------------|---------------------|-------------------------------------|
-| `load_var`     | N          | `... -> ..., value` | Load local variable at index N      |
+| `load_local`   | N          | `... -> ..., value` | Load local variable at index N      |
 | `load_1`       | -          | `... -> ..., value` | Load local variable at index 1      |
-| `store_var`    | N          | `..., value -> ...` | Store to local variable at index N  |
+| `store_local`  | N          | `..., value -> ...` | Store to local variable at index N  |
 | `load_global`  | N          | `... -> ..., value` | Load global variable at index N     |
 | `store_global` | N          | `..., value -> ...` | Store to global variable at index N |
 | `load_builtin` | N          | `... -> ..., value` | Load builtin at index N             |
@@ -314,7 +314,7 @@ This deferred to **Phase 5**.
 - **Builtins:** Provided by the VM runtime in a separate builtin registry. Builtin indices are stable across bytecode
   versions (adding a new builtin doesn't invalidate existing bytecode).
 - **Static resolution:** The compiler knows at compile time which names are builtins, globals, or locals. It emits the
-  appropriate opcode (`load_builtin`, `load_global`, or `load_var`).
+  appropriate opcode (`load_builtin`, `load_global`, or `load_local`).
 - **First-class functions:** User-defined functions are stored in globals. Variables can hold function values, and
   `call` works identically for all function types.
 - **Stack pointer implementation:** The value stack uses `Vec<Value>` with implicit stack pointer (`sp = stack.len()`).

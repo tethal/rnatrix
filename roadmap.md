@@ -67,19 +67,19 @@ See [[README]] for project overview and design decisions.
 
 **3. Bytecode Infrastructure**
 
-- [ ] Introduce `BytecodeBuilder`
-- [ ] Define final `Bytecode` structure: `{ code: Vec<u8>, constants: Vec<Value>, globals: Vec<Value> }`
-- [ ] Implement LEB128 encoding helpers (SLEB128 for signed, ULEB128 for unsigned)
-- [ ] Implement encoder: `BytecodeBuilder → Vec<u8>` (label resolution, constant pooling, encoding)
+- [X] Introduce `BytecodeBuilder`
+- [X] Define `Bytecode` structure: `{ code: Vec<u8>, constants: Vec<Value>, globals: Vec<Value> }`
+- [X] Implement LEB128 encoding helpers (SLEB128 for signed, ULEB128 for unsigned)
+- [X] Implement encoder: `BytecodeBuilder → Vec<u8>`
 
 **4. Simple Bytecode Compiler + VM (minimal language subset)**
 
 - **Language subset:** integers, bools, null, arithmetic, variables, single function (no arguments), return
-- [ ] Compiler: HIR → BytecodeBuilder for expressions and return statements
-- [ ] VM: Stack machine with value stack (`Vec<Value>`)
-- [ ] VM: Instruction dispatch loop for basic opcodes (push, arithmetic, comparisons, ret)
-- [ ] Entry point: `execute(bytecode: Bytecode) -> Result<Value>`
-- [ ] Test: `fn main() { return 2 + 3; }` compiles and executes correctly
+- [X] Compiler: HIR → BytecodeBuilder for expressions and return statements
+- [X] VM: Stack machine with value stack (`Vec<Value>`)
+- [X] VM: Instruction dispatch loop for basic opcodes (push, arithmetic, ret and variables)
+- [X] Entry point: `execute(bytecode: Bytecode) -> Result<Value>`
+- [X] Test: `fn main() { return 2 + 3; }` compiles and executes correctly
 
 **5. Control Flow**
 

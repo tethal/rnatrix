@@ -119,8 +119,8 @@ impl<'ctx> Interpreter<'ctx> {
             let index = self.fun_decls.len();
             let fun_obj = Value::from_function(Rc::new(FunctionObject {
                 name: self.ctx.interner.resolve(decl.name).into(),
-                arity: decl.params.len(),
-                num_locals: 0,
+                param_count: decl.params.len(),
+                max_slots: 0,
                 code_handle: CodeHandle(index),
             }));
             if main_name == Some(decl.name) {
@@ -143,14 +143,14 @@ impl<'ctx> Interpreter<'ctx> {
         }
         let fun_obj = callee.unwrap_function();
 
-        if args.len() != fun_obj.arity {
+        if args.len() != fun_obj.param_count {
             return err_at(
                 span,
                 format!(
                     "function {} expects {} argument{}, but {} were provided",
                     fun_obj.name,
-                    fun_obj.arity,
-                    if fun_obj.arity == 1 { "" } else { "s" },
+                    fun_obj.param_count,
+                    if fun_obj.param_count == 1 { "" } else { "s" },
                     args.len()
                 ),
             );

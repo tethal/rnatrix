@@ -1,5 +1,6 @@
 pub mod analyze;
 pub mod ast;
+pub mod bc;
 pub mod ctx;
 pub mod error;
 pub mod hir;

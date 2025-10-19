@@ -28,7 +28,8 @@ pub enum GlobalKind {
 }
 
 def_node!(Function {
-    locals: Vec<LocalInfo>,
+    param_count: usize,
+    locals: Vec<LocalInfo>, // invariant - first param_count elements are LocalKind::Parameter
     body: Vec<Stmt>,
 });
 
@@ -39,6 +40,7 @@ def_node!(LocalInfo {
     kind: LocalKind,
 });
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum LocalKind {
     Parameter(usize),
     LocalVariable,

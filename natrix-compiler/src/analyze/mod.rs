@@ -2,7 +2,6 @@ mod scope;
 
 use crate::analyze::scope::{BlockScope, FunctionScope, GlobalScope, LocalScope, Lookup, Symbol};
 use crate::ast;
-use crate::ast::AssignTargetKind;
 use crate::ctx::CompilerContext;
 use crate::error::{err_at, SourceResult};
 use crate::hir;
@@ -35,8 +34,22 @@ fn do_fun_decl(
     for (i, param) in ast.params.iter().enumerate() {
         function_scope.declare(ctx, param.name, param.name_span, LocalKind::Parameter(i))?;
     }
-    let body = do_block(ctx, function_scope.clone(), &ast.body)?;
-    Ok(hir::Function::new(function_scope.take_locals(), body))
+    let mut body = do_block(ctx, function_scope.clone(), &ast.body)?;
+    if !body
+        .last()
+        .is_some_and(|s| matches!(s.kind, hir::StmtKind::Return(_)))
+    {
+        let span = ast.body_span.tail();
+        body.push(hir::Stmt::new(
+            hir::StmtKind::Return(hir::Expr::new(hir::ExprKind::ConstNull, span)),
+            span,
+        ));
+    }
+    Ok(hir::Function::new(
+        ast.params.len(),
+        function_scope.take_locals(),
+        body,
+    ))
 }
 
 fn do_block(
@@ -59,8 +72,8 @@ fn do_stmt(
 ) -> SourceResult<hir::Stmt> {
     match &ast.kind {
         ast::StmtKind::Assign { target, value } => match &target.kind {
-            AssignTargetKind::ArrayAccess { array: _, index: _ } => todo!("Array access"),
-            AssignTargetKind::Var(name) => {
+            ast::AssignTargetKind::ArrayAccess { array: _, index: _ } => todo!("Array access"),
+            ast::AssignTargetKind::Var(name) => {
                 let symbol = scope.lookup(ctx, name, target.span)?;
                 let value = do_expr(ctx, scope, value)?;
                 match symbol {
