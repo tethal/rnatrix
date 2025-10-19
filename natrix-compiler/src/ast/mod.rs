@@ -1,5 +1,7 @@
 use crate::ctx::Name;
 use crate::src::Span;
+use crate::util::tree::def_node;
+pub use interpreter::Interpreter;
 use natrix_runtime::nx_err::NxResult;
 use natrix_runtime::value::Value;
 use std::fmt::Debug;
@@ -8,50 +10,34 @@ use std::rc::Rc;
 mod debug;
 mod interpreter;
 
-pub use interpreter::Interpreter;
-
-macro_rules! ast_node {
-    ($name:ident { $($field_name:ident: $field_type:ty),+ $(,)? }) => {
-        pub struct $name {
-            $(pub $field_name: $field_type,)+
-        }
-
-        impl $name {
-            pub fn new($($field_name: $field_type),+) -> Self {
-                Self { $($field_name),+ }
-            }
-        }
-    };
-}
-
-ast_node!(Program {
+def_node!(Program {
     decls: Vec<FunDecl>,
     span: Span,
 });
 
-ast_node!(FunDecl {
+def_node!(FunDecl {
     name: Name,
     name_span: Span,
     params: Vec<Param>,
     body: Stmt,
 });
 
-ast_node!(Param {
+def_node!(Param {
     name: Name,
     name_span: Span,
 });
 
-ast_node!(Stmt {
+def_node!(Stmt {
     kind: StmtKind,
     span: Span,
 });
 
-ast_node!(Expr {
+def_node!(Expr {
     kind: ExprKind,
     span: Span,
 });
 
-ast_node!(AssignTarget {
+def_node!(AssignTarget {
     kind: AssignTargetKind,
     span: Span,
 });
