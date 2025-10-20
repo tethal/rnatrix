@@ -5,177 +5,240 @@ use crate::ast;
 use crate::ctx::CompilerContext;
 use crate::error::{err_at, SourceResult};
 use crate::hir;
-use crate::hir::{GlobalId, GlobalInfo, GlobalKind, LocalKind};
+use crate::hir::{GlobalId, GlobalInfo, GlobalKind, LocalKind, LoopId};
 use std::rc::Rc;
 
 pub fn analyze(ctx: &CompilerContext, ast: &ast::Program) -> SourceResult<hir::Program> {
-    let global_scope = GlobalScope::new(ctx);
-    for (id, ast_decl) in ast.decls.iter().enumerate() {
-        global_scope.declare(ctx, ast_decl.name, ast_decl.name_span, GlobalId(id))?;
-    }
-    let mut globals = Vec::new();
-    for (id, ast_decl) in ast.decls.iter().enumerate() {
-        globals.push(GlobalInfo::new(
-            GlobalId(id),
-            ast_decl.name,
-            ast_decl.name_span,
-            GlobalKind::Function(do_fun_decl(ctx, global_scope.clone(), &ast_decl)?),
-        ));
-    }
-    Ok(hir::Program::new(globals, ast.span))
+    let mut analyzer = Analyzer::new(ctx);
+    analyzer.do_program(ast)
 }
 
-fn do_fun_decl(
-    ctx: &CompilerContext,
+struct Analyzer<'ctx> {
+    ctx: &'ctx CompilerContext,
     global_scope: Rc<GlobalScope>,
-    ast: &ast::FunDecl,
-) -> SourceResult<hir::Function> {
-    let function_scope = FunctionScope::new(global_scope.clone());
-    for (i, param) in ast.params.iter().enumerate() {
-        function_scope.declare(ctx, param.name, param.name_span, LocalKind::Parameter(i))?;
-    }
-    let mut body = do_block(ctx, function_scope.clone(), &ast.body)?;
-    if !body
-        .last()
-        .is_some_and(|s| matches!(s.kind, hir::StmtKind::Return(_)))
-    {
-        let span = ast.body_span.tail();
-        body.push(hir::Stmt::new(
-            hir::StmtKind::Return(hir::Expr::new(hir::ExprKind::ConstNull, span)),
-            span,
-        ));
-    }
-    Ok(hir::Function::new(
-        ast.params.len(),
-        function_scope.take_locals(),
-        body,
-    ))
+    next_loop_id: usize,
 }
 
-fn do_block(
-    ctx: &CompilerContext,
-    scope: Rc<dyn LocalScope>,
-    ast: &Vec<ast::Stmt>,
-) -> SourceResult<Vec<hir::Stmt>> {
-    let block_scope = BlockScope::new(scope);
-    let s = ast
-        .iter()
-        .map(|stmt| do_stmt(ctx, &block_scope, stmt))
-        .collect::<SourceResult<Vec<hir::Stmt>>>()?;
-    Ok(s)
-}
+impl<'ctx> Analyzer<'ctx> {
+    fn new(ctx: &'ctx CompilerContext) -> Self {
+        Self {
+            ctx,
+            global_scope: GlobalScope::new(ctx),
+            next_loop_id: 0,
+        }
+    }
 
-fn do_stmt(
-    ctx: &CompilerContext,
-    scope: &Rc<BlockScope>,
-    ast: &ast::Stmt,
-) -> SourceResult<hir::Stmt> {
-    match &ast.kind {
-        ast::StmtKind::Assign { target, value } => match &target.kind {
-            ast::AssignTargetKind::ArrayAccess { array: _, index: _ } => todo!("Array access"),
-            ast::AssignTargetKind::Var(name) => {
-                let symbol = scope.lookup(ctx, name, target.span)?;
-                let value = do_expr(ctx, scope, value)?;
-                match symbol {
-                    Symbol::Builtin(_) => {
-                        err_at(target.span, "built-in function cannot be assigned to")
+    fn do_program(&mut self, ast: &ast::Program) -> SourceResult<hir::Program> {
+        for (id, ast_decl) in ast.decls.iter().enumerate() {
+            self.global_scope
+                .declare(self.ctx, ast_decl.name, ast_decl.name_span, GlobalId(id))?;
+        }
+        let mut globals = Vec::new();
+        for (id, ast_decl) in ast.decls.iter().enumerate() {
+            globals.push(GlobalInfo::new(
+                GlobalId(id),
+                ast_decl.name,
+                ast_decl.name_span,
+                GlobalKind::Function(self.do_fun_decl(&ast_decl)?),
+            ));
+        }
+        Ok(hir::Program::new(globals, ast.span))
+    }
+
+    fn do_fun_decl(&mut self, ast: &ast::FunDecl) -> SourceResult<hir::Function> {
+        let function_scope = FunctionScope::new(self.global_scope.clone());
+        for (i, param) in ast.params.iter().enumerate() {
+            function_scope.declare(
+                self.ctx,
+                param.name,
+                param.name_span,
+                LocalKind::Parameter(i),
+            )?;
+        }
+        let mut body = self.do_block(function_scope.clone(), None, &ast.body)?;
+        if !body
+            .last()
+            .is_some_and(|s| matches!(s.kind, hir::StmtKind::Return(_)))
+        {
+            let span = ast.body_span.tail();
+            body.push(hir::Stmt::new(
+                hir::StmtKind::Return(hir::Expr::new(hir::ExprKind::ConstNull, span)),
+                span,
+            ));
+        }
+        Ok(hir::Function::new(
+            ast.params.len(),
+            function_scope.take_locals(),
+            body,
+        ))
+    }
+
+    fn do_block(
+        &mut self,
+        scope: Rc<dyn LocalScope>,
+        enclosing_loop: Option<LoopId>,
+        ast: &Vec<ast::Stmt>,
+    ) -> SourceResult<Vec<hir::Stmt>> {
+        let block_scope = BlockScope::new(scope);
+        let s = ast
+            .iter()
+            .map(|stmt| self.do_stmt(&block_scope, enclosing_loop, stmt))
+            .collect::<SourceResult<Vec<hir::Stmt>>>()?;
+        Ok(s)
+    }
+
+    fn do_stmt(
+        &mut self,
+        scope: &Rc<BlockScope>,
+        enclosing_loop: Option<LoopId>,
+        ast: &ast::Stmt,
+    ) -> SourceResult<hir::Stmt> {
+        match &ast.kind {
+            ast::StmtKind::Assign { target, value } => match &target.kind {
+                ast::AssignTargetKind::ArrayAccess { array: _, index: _ } => todo!("Array access"),
+                ast::AssignTargetKind::Var(name) => {
+                    let symbol = scope.lookup(self.ctx, name, target.span)?;
+                    let value = self.do_expr(scope, value)?;
+                    match symbol {
+                        Symbol::Builtin(_) => {
+                            err_at(target.span, "built-in function cannot be assigned to")
+                        }
+                        Symbol::Global(id) => Ok(hir::Stmt::new(
+                            hir::StmtKind::StoreGlobal(id, value),
+                            target.span,
+                        )),
+                        Symbol::Local(id) => Ok(hir::Stmt::new(
+                            hir::StmtKind::StoreLocal(id, value),
+                            target.span,
+                        )),
                     }
-                    Symbol::Global(id) => Ok(hir::Stmt::new(
-                        hir::StmtKind::StoreGlobal(id, value),
-                        target.span,
-                    )),
-                    Symbol::Local(id) => Ok(hir::Stmt::new(
-                        hir::StmtKind::StoreLocal(id, value),
-                        target.span,
-                    )),
+                }
+            },
+            ast::StmtKind::Block(stmts) => Ok(hir::Stmt::new(
+                hir::StmtKind::Block(self.do_block(scope.clone(), enclosing_loop, stmts)?),
+                ast.span,
+            )),
+            ast::StmtKind::Break => {
+                if let Some(loop_id) = enclosing_loop {
+                    Ok(hir::Stmt::new(hir::StmtKind::Break(loop_id), ast.span))
+                } else {
+                    err_at(ast.span, "break outside a loop")
                 }
             }
-        },
-        ast::StmtKind::Block(stmts) => Ok(hir::Stmt::new(
-            hir::StmtKind::Block(do_block(ctx, scope.clone(), stmts)?),
-            ast.span,
-        )),
-        // Break
-        // Continue
-        ast::StmtKind::Expr(expr) => {
-            let expr = do_expr(ctx, scope, expr)?;
-            Ok(hir::Stmt::new(hir::StmtKind::Expr(expr), ast.span))
+            ast::StmtKind::Continue => {
+                if let Some(loop_id) = enclosing_loop {
+                    Ok(hir::Stmt::new(hir::StmtKind::Continue(loop_id), ast.span))
+                } else {
+                    err_at(ast.span, "continue outside a loop")
+                }
+            }
+            ast::StmtKind::Expr(expr) => {
+                let expr = self.do_expr(scope, expr)?;
+                Ok(hir::Stmt::new(hir::StmtKind::Expr(expr), ast.span))
+            }
+            ast::StmtKind::If {
+                cond,
+                then_body,
+                else_body,
+            } => {
+                let cond = self.do_expr(scope, cond)?;
+                let then_body = self.do_stmt(&scope, enclosing_loop, then_body)?;
+                let else_body = if let Some(stmt) = else_body {
+                    Some(self.do_stmt(&scope, enclosing_loop, stmt)?)
+                } else {
+                    None
+                };
+                Ok(hir::Stmt::new(
+                    hir::StmtKind::If(cond, Box::new(then_body), else_body.map(Box::new)),
+                    ast.span,
+                ))
+            }
+            ast::StmtKind::Return(expr) => {
+                let e = match expr {
+                    Some(e) => self.do_expr(scope, e)?,
+                    None => hir::Expr::new(hir::ExprKind::ConstNull, ast.span),
+                };
+                Ok(hir::Stmt::new(hir::StmtKind::Return(e), ast.span))
+            }
+            ast::StmtKind::VarDecl {
+                name,
+                name_span,
+                init,
+            } => {
+                let value = self.do_expr(&scope, init)?;
+                let id = scope.declare(self.ctx, *name, *name_span, LocalKind::LocalVariable)?;
+                Ok(hir::Stmt::new(hir::StmtKind::VarDecl(id, value), ast.span))
+            }
+            ast::StmtKind::While { cond, body } => {
+                let loop_id = LoopId(self.next_loop_id);
+                self.next_loop_id += 1;
+                let cond = self.do_expr(scope, cond)?;
+                let body = self.do_stmt(&scope, Some(loop_id), body)?;
+                Ok(hir::Stmt::new(
+                    hir::StmtKind::While(loop_id, cond, Box::new(body)),
+                    ast.span,
+                ))
+            }
         }
-        // If
-        ast::StmtKind::Return(expr) => {
-            let e = match expr {
-                Some(e) => do_expr(ctx, scope, e)?,
-                None => hir::Expr::new(hir::ExprKind::ConstNull, ast.span),
-            };
-            Ok(hir::Stmt::new(hir::StmtKind::Return(e), ast.span))
-        }
-        ast::StmtKind::VarDecl {
-            name,
-            name_span,
-            init,
-        } => {
-            let value = do_expr(ctx, &scope, init)?;
-            let id = scope.declare(ctx, *name, *name_span, LocalKind::LocalVariable)?;
-            Ok(hir::Stmt::new(hir::StmtKind::VarDecl(id, value), ast.span))
-        }
-        // While
-        _ => todo!("{:?}", ast),
     }
-}
 
-fn do_expr(
-    ctx: &CompilerContext,
-    scope: &Rc<BlockScope>,
-    ast: &ast::Expr,
-) -> SourceResult<hir::Expr> {
-    match &ast.kind {
-        // ArrayAccess
-        ast::ExprKind::Binary {
-            op,
-            op_span,
-            left,
-            right,
-        } => {
-            let left = do_expr(ctx, scope, left)?;
-            let right = do_expr(ctx, scope, right)?;
-            Ok(hir::Expr::new(
-                hir::ExprKind::Binary {
-                    op: *op,
-                    op_span: *op_span,
-                    left: Box::new(left),
-                    right: Box::new(right),
+    fn do_expr(&mut self, scope: &Rc<BlockScope>, ast: &ast::Expr) -> SourceResult<hir::Expr> {
+        match &ast.kind {
+            // ArrayAccess
+            ast::ExprKind::Binary {
+                op,
+                op_span,
+                left,
+                right,
+            } => {
+                let left = self.do_expr(scope, left)?;
+                let right = self.do_expr(scope, right)?;
+                Ok(hir::Expr::new(
+                    hir::ExprKind::Binary(*op, *op_span, Box::new(left), Box::new(right)),
+                    ast.span,
+                ))
+            }
+            ast::ExprKind::BoolLiteral(v) => {
+                Ok(hir::Expr::new(hir::ExprKind::ConstBool(*v), ast.span))
+            }
+            // Call
+            // FloatLiteral
+            ast::ExprKind::IntLiteral(v) => {
+                Ok(hir::Expr::new(hir::ExprKind::ConstInt(*v), ast.span))
+            }
+            // ListLiteral
+            ast::ExprKind::LogicalBinary {
+                and,
+                op_span,
+                left,
+                right,
+            } => {
+                let left = self.do_expr(scope, left)?;
+                let right = self.do_expr(scope, right)?;
+                Ok(hir::Expr::new(
+                    hir::ExprKind::LogicalBinary(*and, *op_span, Box::new(left), Box::new(right)),
+                    ast.span,
+                ))
+            }
+            ast::ExprKind::NullLiteral => Ok(hir::Expr::new(hir::ExprKind::ConstNull, ast.span)),
+            ast::ExprKind::Paren(expr) => self.do_expr(scope, expr),
+            // StringLiteral
+            ast::ExprKind::Unary { op, op_span, expr } => {
+                let expr = self.do_expr(scope, expr)?;
+                Ok(hir::Expr::new(
+                    hir::ExprKind::Unary(*op, *op_span, Box::new(expr)),
+                    ast.span,
+                ))
+            }
+            ast::ExprKind::Var(name) => Ok(hir::Expr::new(
+                match scope.lookup(self.ctx, name, ast.span)? {
+                    Symbol::Builtin(builtin) => hir::ExprKind::LoadBuiltin(builtin),
+                    Symbol::Global(id) => hir::ExprKind::LoadGlobal(id),
+                    Symbol::Local(id) => hir::ExprKind::LoadLocal(id),
                 },
                 ast.span,
-            ))
+            )),
+            _ => todo!("{:?}", ast),
         }
-        ast::ExprKind::BoolLiteral(v) => Ok(hir::Expr::new(hir::ExprKind::ConstBool(*v), ast.span)),
-        // Call
-        // FloatLiteral
-        ast::ExprKind::IntLiteral(v) => Ok(hir::Expr::new(hir::ExprKind::ConstInt(*v), ast.span)),
-        // ListLiteral
-        // LogicalBinary
-        ast::ExprKind::NullLiteral => Ok(hir::Expr::new(hir::ExprKind::ConstNull, ast.span)),
-        ast::ExprKind::Paren(expr) => do_expr(ctx, scope, expr),
-        // StringLiteral
-        ast::ExprKind::Unary { op, op_span, expr } => {
-            let expr = do_expr(ctx, scope, expr)?;
-            Ok(hir::Expr::new(
-                hir::ExprKind::Unary {
-                    op: *op,
-                    op_span: *op_span,
-                    expr: Box::new(expr),
-                },
-                ast.span,
-            ))
-        }
-        ast::ExprKind::Var(name) => Ok(hir::Expr::new(
-            match scope.lookup(ctx, name, ast.span)? {
-                Symbol::Builtin(builtin) => hir::ExprKind::LoadBuiltin(builtin),
-                Symbol::Global(id) => hir::ExprKind::LoadGlobal(id),
-                Symbol::Local(id) => hir::ExprKind::LoadLocal(id),
-            },
-            ast.span,
-        )),
-        _ => todo!("{:?}", ast),
     }
 }

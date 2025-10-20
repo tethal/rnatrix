@@ -84,10 +84,10 @@ See [[README]] for project overview and design decisions.
 **5. Control Flow**
 
 - **Add to language:** if/else, while, break/continue
-- [ ] Compiler: Jump label tracking
-- [ ] Compiler: Conditional jumps (jtrue/jfalse), unconditional jumps (jmp)
-- [ ] VM: Jump instructions (update instruction pointer)
-- [ ] Test: Loops, conditionals, local variable manipulation
+- [X] Compiler: Jump label tracking
+- [X] Compiler: Conditional jumps (jtrue/jfalse), unconditional jumps (jmp)
+- [X] VM: Jump instructions (update instruction pointer)
+- [ ] Test: Loops, conditionals, local variable manipulation, De Morgan
 
 **6. Functions and Calls**
 

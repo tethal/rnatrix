@@ -1,24 +1,28 @@
-use crate::error::SourceResult;
 use crate::src::Span;
-use std::fmt::Debug;
+use natrix_runtime::bc::Opcode;
+use natrix_runtime::leb128::{encode_sleb128, encode_uleb128};
+use std::fmt::{Debug, Display};
 
-pub struct Ins {
-    pub kind: InsKind,
-    pub span: Span,
-}
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct Label(usize);
 
-impl Ins {
-    pub fn new(kind: InsKind, span: Span) -> Self {
-        Self { kind, span }
+impl Display for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "L{}", self.0)
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum InsKind {
     Add,
     Div,
     Eq,
     Ge,
     Gt,
+    JFalse(Label),
+    Jmp(Label),
+    JTrue(Label),
+    LabelDef(Label),
     Le,
     Load1,
     LoadBuiltin(usize),
@@ -43,60 +47,159 @@ pub enum InsKind {
     Sub,
 }
 
+pub struct Ins {
+    pub kind: InsKind,
+    pub span: Span,
+}
+
+impl Ins {
+    pub fn new(kind: InsKind, span: Span) -> Self {
+        Self { kind, span }
+    }
+
+    fn encoding(&self) -> (Opcode, Immediates) {
+        match self.kind {
+            InsKind::Add => (Opcode::Add, Immediates::None),
+            InsKind::Div => (Opcode::Div, Immediates::None),
+            InsKind::Eq => (Opcode::Eq, Immediates::None),
+            InsKind::Ge => (Opcode::Ge, Immediates::None),
+            InsKind::Gt => (Opcode::Gt, Immediates::None),
+            InsKind::JFalse(label) => (Opcode::JFalse, Immediates::Label(label)),
+            InsKind::Jmp(label) => (Opcode::Jmp, Immediates::Label(label)),
+            InsKind::JTrue(label) => (Opcode::JTrue, Immediates::Label(label)),
+            InsKind::LabelDef(_) => unreachable!(),
+            InsKind::Le => (Opcode::Le, Immediates::None),
+            InsKind::Load1 => (Opcode::Load1, Immediates::None),
+            InsKind::LoadBuiltin(i) => (Opcode::LoadBuiltin, Immediates::Usize(i)),
+            InsKind::LoadGlobal(i) => (Opcode::LoadGlobal, Immediates::Usize(i)),
+            InsKind::LoadLocal(i) => (Opcode::LoadLocal, Immediates::Usize(i)),
+            InsKind::Lt => (Opcode::Lt, Immediates::None),
+            InsKind::Mod => (Opcode::Mod, Immediates::None),
+            InsKind::Mul => (Opcode::Mul, Immediates::None),
+            InsKind::Ne => (Opcode::Ne, Immediates::None),
+            InsKind::Neg => (Opcode::Neg, Immediates::None),
+            InsKind::Not => (Opcode::Not, Immediates::None),
+            InsKind::Pop => (Opcode::Pop, Immediates::None),
+            InsKind::Push0 => (Opcode::Push0, Immediates::None),
+            InsKind::Push1 => (Opcode::Push1, Immediates::None),
+            InsKind::PushFalse => (Opcode::PushFalse, Immediates::None),
+            InsKind::PushInt(v) => (Opcode::PushInt, Immediates::I64(v)),
+            InsKind::PushNull => (Opcode::PushNull, Immediates::None),
+            InsKind::PushTrue => (Opcode::PushTrue, Immediates::None),
+            InsKind::Ret => (Opcode::Ret, Immediates::None),
+            InsKind::StoreGlobal(i) => (Opcode::StoreGlobal, Immediates::Usize(i)),
+            InsKind::StoreLocal(i) => (Opcode::StoreLocal, Immediates::Usize(i)),
+            InsKind::Sub => (Opcode::Sub, Immediates::None),
+        }
+    }
+}
+
+impl Debug for Ins {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let InsKind::LabelDef(label) = self.kind {
+            write!(f, "{}:", label)
+        } else {
+            let (opcode, immediates) = self.encoding();
+            write!(f, "  {}", opcode.name())?;
+            match immediates {
+                Immediates::None => Ok(()),
+                Immediates::Usize(i) => write!(f, " {}", i),
+                Immediates::I64(i) => write!(f, " {}", i),
+                Immediates::Label(label) => write!(f, " {}", label),
+            }
+        }
+    }
+}
+
 pub struct BytecodeBuilder {
     pub ins: Vec<Ins>,
+    label_count: usize,
 }
 
 impl BytecodeBuilder {
     pub fn new() -> Self {
-        Self { ins: Vec::new() }
+        Self {
+            ins: Vec::new(),
+            label_count: 0,
+        }
     }
 
-    pub fn append(&mut self, span: Span, ins_kind: InsKind) -> SourceResult<()> {
+    pub fn new_label(&mut self) -> Label {
+        let label = Label(self.label_count);
+        self.label_count += 1;
+        label
+    }
+
+    pub fn define_label(&mut self, span: Span, label: Label) {
+        assert!(
+            !self.ins.iter().any(|i| i.kind == InsKind::LabelDef(label)),
+            "label {:?} already defined",
+            label
+        );
+        self.ins.push(Ins::new(InsKind::LabelDef(label), span));
+    }
+
+    pub fn append(&mut self, span: Span, ins_kind: InsKind) {
+        assert!(!matches!(ins_kind, InsKind::LabelDef(_)));
         self.ins.push(Ins::new(ins_kind, span));
-        Ok(())
+    }
+
+    pub fn encode(&self) -> Vec<u8> {
+        let (_, mut label_offsets) = self.encode_pass(|_, _| 0);
+        loop {
+            let (code, new_label_offsets) =
+                self.encode_pass(|from, to_label| label_offsets[to_label.0] as i64 - from as i64);
+            if new_label_offsets == label_offsets {
+                return code;
+            }
+            assert!(
+                new_label_offsets
+                    .iter()
+                    .zip(label_offsets.iter())
+                    .all(|(n, o)| n >= o),
+                "label offsets can only grow"
+            );
+            label_offsets = new_label_offsets;
+        }
+    }
+
+    fn encode_pass<F: Fn(usize, Label) -> i64>(&self, calc_delta: F) -> (Vec<u8>, Vec<usize>) {
+        let mut label_offsets = Vec::new();
+        label_offsets.resize(self.label_count, 0);
+        let mut code = Vec::new();
+        for ins in self.ins.iter() {
+            if let InsKind::LabelDef(label) = ins.kind {
+                label_offsets[label.0] = code.len();
+            } else {
+                let (opcode, immediates) = ins.encoding();
+                code.push(opcode as u8);
+                match immediates {
+                    Immediates::None => {}
+                    Immediates::Usize(i) => encode_uleb128(i, |b| code.push(b)),
+                    Immediates::I64(i) => encode_sleb128(i, |b| code.push(b)),
+                    Immediates::Label(label) => {
+                        encode_sleb128(calc_delta(code.len() - 1, label), |b| code.push(b));
+                    }
+                }
+            }
+        }
+        (code, label_offsets)
     }
 }
 
 impl Debug for BytecodeBuilder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for ins in &self.ins {
-            write!(f, "{:?}\n", ins.kind)?;
+            write!(f, "{:?}\n", ins)?;
         }
         Ok(())
     }
 }
 
-impl Debug for InsKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InsKind::Add => write!(f, "  add"),
-            InsKind::Div => write!(f, "  div"),
-            InsKind::Eq => write!(f, "  eq"),
-            InsKind::Ge => write!(f, "  ge"),
-            InsKind::Gt => write!(f, "  gt"),
-            InsKind::Le => write!(f, "  le"),
-            InsKind::Load1 => write!(f, "  load_1"),
-            InsKind::LoadBuiltin(index) => write!(f, "  load_builtin #{}", index),
-            InsKind::LoadGlobal(index) => write!(f, "  load_global #{}", index),
-            InsKind::LoadLocal(index) => write!(f, "  load_local #{}", index),
-            InsKind::Lt => write!(f, "  lt"),
-            InsKind::Mod => write!(f, "  mod"),
-            InsKind::Mul => write!(f, "  mul"),
-            InsKind::Ne => write!(f, "  ne"),
-            InsKind::Neg => write!(f, "  neg"),
-            InsKind::Not => write!(f, "  not"),
-            InsKind::Pop => write!(f, "  pop"),
-            InsKind::Push0 => write!(f, "  push_0"),
-            InsKind::Push1 => write!(f, "  push_1"),
-            InsKind::PushFalse => write!(f, "  push_false"),
-            InsKind::PushInt(v) => write!(f, "  push_int {}", v),
-            InsKind::PushNull => write!(f, "  push_null"),
-            InsKind::PushTrue => write!(f, "  push_true"),
-            InsKind::Ret => write!(f, "  ret"),
-            InsKind::StoreGlobal(index) => write!(f, "  store_global #{}", index),
-            InsKind::StoreLocal(index) => write!(f, "  store_local #{}", index),
-            InsKind::Sub => write!(f, "  sub"),
-        }
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Immediates {
+    None,
+    Usize(usize),
+    I64(i64),
+    Label(Label),
 }

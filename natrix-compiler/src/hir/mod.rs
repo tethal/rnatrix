@@ -6,10 +6,14 @@ use crate::util::tree::def_node;
 use natrix_runtime::runtime::Builtin;
 use natrix_runtime::value::{BinaryOp, UnaryOp};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct GlobalId(pub usize);
-#[derive(Debug, Copy, Clone)]
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct LocalId(pub usize);
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct LoopId(pub usize);
 
 def_node!(Program {
     globals: Vec<GlobalInfo>,
@@ -53,11 +57,15 @@ def_node!(Stmt {
 
 pub enum StmtKind {
     Block(Vec<Stmt>),
+    Break(LoopId),
+    Continue(LoopId),
     Expr(Expr),
+    If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     Return(Expr),
     StoreGlobal(GlobalId, Expr),
     StoreLocal(LocalId, Expr),
     VarDecl(LocalId, Expr),
+    While(LoopId, Expr, Box<Stmt>),
 }
 
 def_node!(Expr {
@@ -66,21 +74,13 @@ def_node!(Expr {
 });
 
 pub enum ExprKind {
-    Binary {
-        op: BinaryOp,
-        op_span: Span,
-        left: Box<Expr>,
-        right: Box<Expr>,
-    },
+    Binary(BinaryOp, Span, Box<Expr>, Box<Expr>),
     ConstBool(bool),
     ConstInt(i64),
     ConstNull,
     LoadBuiltin(Builtin),
     LoadGlobal(GlobalId),
     LoadLocal(LocalId),
-    Unary {
-        op: UnaryOp,
-        op_span: Span,
-        expr: Box<Expr>,
-    },
+    LogicalBinary(bool, Span, Box<Expr>, Box<Expr>),
+    Unary(UnaryOp, Span, Box<Expr>),
 }

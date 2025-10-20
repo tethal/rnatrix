@@ -79,9 +79,20 @@ impl<'a> Debug for StmtDebug<'a> {
                 }
                 Ok(())
             }
+            StmtKind::Break(id) => self.fmt.header_with_value(f, "Break", span, id),
+            StmtKind::Continue(id) => self.fmt.header_with_value(f, "Continue", span, id),
             StmtKind::Expr(expr) => {
                 self.fmt.header(f, "Expr", span)?;
                 self.fmt.expr(f, expr)
+            }
+            StmtKind::If(cond, then_body, else_body) => {
+                self.fmt.header(f, "If", span)?;
+                self.fmt.expr(f, cond)?;
+                self.fmt.stmt(f, then_body)?;
+                if let Some(else_body) = else_body {
+                    self.fmt.stmt(f, else_body)?;
+                };
+                Ok(())
             }
             StmtKind::Return(expr) => {
                 self.fmt.header(f, "Return", span)?;
@@ -99,6 +110,11 @@ impl<'a> Debug for StmtDebug<'a> {
                 self.fmt.header_with_value(f, "VarDecl", span, id)?;
                 self.fmt.expr(f, value)
             }
+            StmtKind::While(id, cond, body) => {
+                self.fmt.header_with_value(f, "While", span, id)?;
+                self.fmt.expr(f, cond)?;
+                self.fmt.stmt(f, body)
+            }
         }
     }
 }
@@ -109,12 +125,7 @@ impl<'a> Debug for ExprDebug<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let span = self.expr.span;
         match &self.expr.kind {
-            ExprKind::Binary {
-                op,
-                op_span,
-                left,
-                right,
-            } => {
+            ExprKind::Binary(op, op_span, left, right) => {
                 self.fmt.header_with_value(f, "Binary", *op_span, *op)?;
                 self.fmt.expr(f, left)?;
                 self.fmt.expr(f, right)
@@ -127,7 +138,13 @@ impl<'a> Debug for ExprDebug<'a> {
             }
             ExprKind::LoadGlobal(id) => self.fmt.header_with_value(f, "LoadGlobal", span, id),
             ExprKind::LoadLocal(id) => self.fmt.header_with_value(f, "LoadLocal", span, id),
-            ExprKind::Unary { op, op_span, expr } => {
+            ExprKind::LogicalBinary(and, op_span, left, right) => {
+                self.fmt.header(f, "LogicalBinary", span)?;
+                self.fmt.property_with_span(f, "and", and, *op_span)?;
+                self.fmt.expr(f, left)?;
+                self.fmt.expr(f, right)
+            }
+            ExprKind::Unary(op, op_span, expr) => {
                 self.fmt.header_with_value(f, "Unary", *op_span, *op)?;
                 self.fmt.expr(f, expr)
             }

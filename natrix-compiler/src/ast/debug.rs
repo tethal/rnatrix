@@ -103,8 +103,7 @@ impl Debug for StmtDebug<'_> {
             StmtKind::While { cond, body } => {
                 self.fmt.header(f, "While", span)?;
                 self.fmt.expr(f, cond)?;
-                self.fmt.stmt(f, body)?;
-                Ok(())
+                self.fmt.stmt(f, body)
             }
         }
     }

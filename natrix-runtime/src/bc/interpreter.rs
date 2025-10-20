@@ -1,7 +1,8 @@
 use crate::bc::{Bytecode, Opcode};
-use crate::nx_err::NxResult;
+use crate::leb128::{decode_sleb128, decode_uleb128};
+use crate::nx_err::{nx_err, NxResult};
 use crate::runtime::{Builtin, Runtime};
-use crate::value::Value;
+use crate::value::{Value, ValueType};
 use std::rc::Rc;
 
 pub struct Interpreter<'rt> {
@@ -45,41 +46,24 @@ impl<'rt> Interpreter<'rt> {
         }
 
         macro_rules! fetch_sleb {
-            () => {{
-                let mut result = 0i64;
-                let mut shift = 0;
-                let mut byte;
-                loop {
-                    byte = fetch_u8!();
-                    result |= ((byte & 0x7f) as i64) << shift;
-                    shift += 7;
-                    if (byte & 0x80) == 0 {
-                        break;
-                    }
-                }
-                if shift < 64 && (byte & 0x40) != 0 {
-                    result |= (!0i64 << shift);
-                }
-                result
-            }};
+            () => {
+                decode_sleb128(|| fetch_u8!())
+            };
         }
 
         macro_rules! fetch_uleb {
+            () => {
+                decode_uleb128(|| fetch_u8!())
+            };
+        }
+
+        macro_rules! fetch_jump_target {
             () => {{
-                let mut result = 0usize;
-                let mut shift = 0;
-                let mut byte;
-                loop {
-                    byte = fetch_u8!();
-                    result |= ((byte & 0x7f) as usize) << shift;
-                    shift += 7;
-                    if (byte & 0x80) == 0 {
-                        break;
-                    }
-                }
-                result
+                let from = ip - 1;
+                (from as i64 + decode_sleb128(|| fetch_u8!())) as usize
             }};
         }
+
         macro_rules! pop {
             () => {
                 stack.pop().unwrap()
@@ -90,6 +74,17 @@ impl<'rt> Interpreter<'rt> {
             ($val:expr) => {
                 stack.push($val)
             };
+        }
+
+        macro_rules! pop_bool {
+            () => {{
+                let value = pop!();
+                if value.get_type() != ValueType::Bool {
+                    nx_err("expected a boolean value")
+                } else {
+                    Ok(value.unwrap_bool())
+                }
+            }};
         }
 
         macro_rules! unary {
@@ -138,9 +133,19 @@ impl<'rt> Interpreter<'rt> {
                 // MakeList => "make_list";        // 1A // N
                 // GetItem => "get_item";          // 1B
                 // SetItem => "set_item";          // 1C
-                // Jmp => "jmp";                   // 1D // offset
-                // JFalse => "jfalse";             // 1E // offset
-                // JTrue => "jtrue";               // 1F // offset
+                Opcode::Jmp => ip = fetch_jump_target!(),
+                Opcode::JFalse => {
+                    let target = fetch_jump_target!();
+                    if !pop_bool!()? {
+                        ip = target;
+                    }
+                }
+                Opcode::JTrue => {
+                    let target = fetch_jump_target!();
+                    if pop_bool!()? {
+                        ip = target;
+                    }
+                }
                 // Call => "call";                 // 20 // N
                 Opcode::Ret => {
                     let ret_val = pop!();

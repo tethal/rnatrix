@@ -143,7 +143,7 @@ independent of bytecode versioning.
 | `jtrue`  | offset     | `..., cond -> ...` | Jump if true (pops condition)  |
 | `jfalse` | offset     | `..., cond -> ...` | Jump if false (pops condition) |
 
-Jump offsets are **relative** to the instruction pointer after reading the offset immediate.
+Jump offsets are relative to the start of the jump instruction.
 
 ---
 
