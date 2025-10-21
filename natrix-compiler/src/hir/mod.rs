@@ -74,6 +74,7 @@ def_node!(Expr {
 
 pub enum ExprKind {
     Binary(BinaryOp, Span, Box<Expr>, Box<Expr>),
+    Call(Box<Expr>, Vec<Expr>),
     ConstBool(bool),
     ConstInt(i64),
     ConstNull,

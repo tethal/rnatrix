@@ -10,7 +10,7 @@ pub struct Bytecode {
     // pub constants: Vec<Value>,
     // line table
     pub globals: Vec<Value>,
-    // entry point - just index to globals, or ensure main is first
+    pub main_index: usize,
 }
 
 macro_rules! define_opcodes {

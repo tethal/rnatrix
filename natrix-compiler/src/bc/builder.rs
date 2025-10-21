@@ -15,6 +15,7 @@ impl Display for Label {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum InsKind {
     Add,
+    Call(usize),
     Div,
     Eq,
     Ge,
@@ -60,6 +61,7 @@ impl Ins {
     fn encoding(&self) -> (Opcode, Immediates) {
         match self.kind {
             InsKind::Add => (Opcode::Add, Immediates::None),
+            InsKind::Call(arg_count) => (Opcode::Call, Immediates::Usize(arg_count)),
             InsKind::Div => (Opcode::Div, Immediates::None),
             InsKind::Eq => (Opcode::Eq, Immediates::None),
             InsKind::Ge => (Opcode::Ge, Immediates::None),

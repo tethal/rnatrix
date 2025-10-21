@@ -5,13 +5,22 @@ use crate::leb128::{decode_sleb128, decode_uleb128};
 use crate::value::{Builtin, Function, Value, ValueType};
 use std::rc::Rc;
 
-pub struct Interpreter<'rt> {
-    rt: &'rt mut RuntimeContext,
+struct CallFrame {
+    ret_addr: usize,
+    prev_fp: usize,
 }
 
-impl<'rt> Interpreter<'rt> {
-    pub fn new(rt: &'rt mut RuntimeContext) -> Self {
-        Self { rt }
+pub struct Interpreter<'a> {
+    rt: &'a mut RuntimeContext,
+    frames: Vec<CallFrame>,
+}
+
+impl<'a> Interpreter<'a> {
+    pub fn new(rt: &'a mut RuntimeContext) -> Self {
+        Self {
+            rt,
+            frames: Vec::new(),
+        }
     }
 
     fn prepare_builtins() -> Vec<Value> {
@@ -21,25 +30,31 @@ impl<'rt> Interpreter<'rt> {
             .collect()
     }
 
-    pub fn run(&mut self, bc: &Bytecode, mut args: Vec<Value>) -> NxResult<Value> {
+    fn prepare_stack(main: Value, mut args: Vec<Value>) -> NxResult<(Vec<Value>, usize)> {
+        match main.unwrap_function().as_ref() {
+            Function::UserDefined {
+                max_slots,
+                code_handle,
+                ..
+            } => {
+                main.unwrap_function().check_args(args.len())?;
+                let mut stack = Vec::new();
+                stack.push(main.clone());
+                stack.append(&mut args);
+                stack.resize(stack.len() + *max_slots - args.len(), Value::NULL);
+                Ok((stack, *code_handle))
+            }
+            _ => panic!("Bytecode main_index is not a user defined function"),
+        }
+    }
+
+    pub fn run(&mut self, bc: &Bytecode, args: Vec<Value>) -> NxResult<Value> {
         let builtins = Self::prepare_builtins();
         let mut globals = bc.globals.clone();
-        let main = &globals[0].unwrap_function();
-        let max_slots = if let Function::UserDefined { max_slots, .. } = main.as_ref() {
-            max_slots
-        } else {
-            todo!()
-        };
+        let main = &globals[bc.main_index];
+        let (mut stack, mut ip) = Self::prepare_stack(main.clone(), args)?;
         let code = &bc.code;
-        let mut ip = 0; // TODO code_handle from Function
-        let mut stack = Vec::new();
-        let arg_cnt = args.len();
-        let fp = 1;
-        stack.push(Value::NULL); // TODO push main function object
-        stack.append(&mut args);
-        assert_eq!(arg_cnt, main.param_count());
-        stack.resize(stack.len() + *max_slots - arg_cnt, Value::NULL);
-        // TODO do what "call arg_cnt" does - check args count, push frame, setup FP
+        let mut fp = 1usize;
 
         macro_rules! fetch_u8 {
             () => {{
@@ -150,11 +165,47 @@ impl<'rt> Interpreter<'rt> {
                         ip = target;
                     }
                 }
-                // Call => "call";                 // 20 // N
+                Opcode::Call => {
+                    let arg_count = fetch_uleb!();
+                    let new_fp = stack.len() - arg_count;
+                    let fun_obj = &stack[new_fp - 1];
+                    let fun_obj = if fun_obj.is_function() {
+                        fun_obj.unwrap_function()
+                    } else {
+                        return nx_err("expected a function");
+                    };
+                    fun_obj.check_args(arg_count)?;
+                    match fun_obj.as_ref() {
+                        Function::Builtin(builtin) => {
+                            builtin.eval(self.rt, &stack[new_fp..new_fp + arg_count])?;
+                        }
+                        Function::UserDefined {
+                            max_slots,
+                            code_handle,
+                            ..
+                        } => {
+                            stack.resize(stack.len() + *max_slots - arg_count, Value::NULL);
+                            self.frames.push(CallFrame {
+                                ret_addr: ip,
+                                prev_fp: fp,
+                            });
+                            fp = new_fp;
+                            ip = *code_handle;
+                        }
+                    }
+                }
                 Opcode::Ret => {
-                    let ret_val = pop!();
-                    // TODO pop frame and continue if not last, otherwise:
-                    return Ok(ret_val);
+                    stack[fp - 1] = stack.last().unwrap().clone();
+                    stack.resize(fp, Value::NULL);
+                    match self.frames.pop() {
+                        Some(frame) => {
+                            ip = frame.ret_addr;
+                            fp = frame.prev_fp;
+                        }
+                        None => {
+                            return Ok(pop!());
+                        }
+                    }
                 }
                 Opcode::Pop => {
                     pop!();

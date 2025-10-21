@@ -130,6 +130,14 @@ impl<'a> Debug for ExprDebug<'a> {
                 self.fmt.expr(f, left)?;
                 self.fmt.expr(f, right)
             }
+            ExprKind::Call(callee, args) => {
+                self.fmt.header(f, "Call", span)?;
+                self.fmt.expr(f, callee)?;
+                for a in args {
+                    self.fmt.expr(f, a)?;
+                }
+                Ok(())
+            }
             ExprKind::ConstBool(value) => self.fmt.header_with_value(f, "ConstBool", span, value),
             ExprKind::ConstInt(value) => self.fmt.header_with_value(f, "ConstInt", span, value),
             ExprKind::ConstNull => self.fmt.header(f, "ConstNull", span),

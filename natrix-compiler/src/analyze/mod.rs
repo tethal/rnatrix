@@ -201,6 +201,17 @@ impl<'a> Analyzer<'a> {
             ast::ExprKind::BoolLiteral(v) => {
                 Ok(hir::Expr::new(hir::ExprKind::ConstBool(*v), ast.span))
             }
+            ast::ExprKind::Call { callee, args } => {
+                let callee = self.do_expr(scope, callee)?;
+                let args = args
+                    .iter()
+                    .map(|arg| self.do_expr(scope, arg))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(hir::Expr::new(
+                    hir::ExprKind::Call(Box::new(callee), args),
+                    ast.span,
+                ))
+            }
             // Call
             // FloatLiteral
             ast::ExprKind::IntLiteral(v) => {

@@ -92,10 +92,10 @@ See [[README]] for project overview and design decisions.
 **6. Functions and Calls**
 
 - **Add to language:** function arguments, multiple functions, function calls
-- [ ] Compiler: Function objects in globals array
-- [ ] Compiler: Call instruction emission, argument handling
-- [ ] VM: Frame metadata stack (`Vec<CallFrame>`)
-- [ ] VM: Frame management (push/pop CallFrame on call/ret, frame pointer tracking)
+- [X] Compiler: Function objects in globals array
+- [X] Compiler: Call instruction emission, argument handling
+- [X] VM: Frame metadata stack (`Vec<CallFrame>`)
+- [X] VM: Frame management (push/pop CallFrame on call/ret, frame pointer tracking)
 - [ ] Test: Recursive functions (e.g., fibonacci), multiple function calls
 
 **7. Remaining Features (deferred - can be implemented in any order)**
