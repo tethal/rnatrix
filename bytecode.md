@@ -101,7 +101,7 @@ String comparisons use lexicographic ordering. Numeric comparisons work across i
 | Opcode         | Immediates | Stack Effect        | Description                         |
 |----------------|------------|---------------------|-------------------------------------|
 | `load_local`   | N          | `... -> ..., value` | Load local variable at index N      |
-| `load_1`       | -          | `... -> ..., value` | Load local variable at index 1      |
+| `load_0`       | -          | `... -> ..., value` | Load local variable at index 0      |
 | `store_local`  | N          | `..., value -> ...` | Store to local variable at index N  |
 | `load_global`  | N          | `... -> ..., value` | Load global variable at index N     |
 | `store_global` | N          | `..., value -> ...` | Store to global variable at index N |
@@ -109,14 +109,13 @@ String comparisons use lexicographic ordering. Numeric comparisons work across i
 
 **Local variable indices** are **relative to the frame pointer** (`fp`):
 
-- Index 0: function object (not normally accessed; reserved for future reflection/introspection features)
-- Indices 1..arity: function arguments
-- Indices (arity+1)..: local variables
+- Indices 0..(arity-1): function arguments
+- Indices arity..: local variables
 
 All local variables (arguments and locals) use the same addressing scheme with unsigned indices.
 
-*Note: `load_1` is a special opcode for loading the first argument, which is extremely common for `self`/`this` in
-method calls and primary data arguments. Saves 1 byte per access.*
+*Note: `load_0` is a special opcode for loading the first (index 0) argument, which is extremely
+common for `self`/`this` in method calls and primary data arguments. Saves 1 byte per access.*
 
 **Global variable indices** reference the `bytecode.globals` array. Globals are pre-initialized when bytecode is loaded.
 
@@ -185,14 +184,14 @@ enum ValueImpl {
 3. `call N` instruction:
     - Validates `function.arity == N` (runtime arity check)
     - Pushes new `CallFrame { return_ip, prev_fp }` to frame metadata stack
-    - Sets `fp` to point to function object on value stack
+    - Sets `fp` to point to the first argument (directly after the function object) on value stack
     - Reserves slots for locals by pushing num_locals NULL values
     - Sets `ip = function.id` (function start address)
 4. Callee executes with arguments and locals accessible via `fp + offset`
 5. `ret` instruction:
     - Saves return value from top of stack
     - Resets `sp = fp` (discards all args and locals; no copying)
-    - Writes return value at `fp` (overwrites function object slot)
+    - Writes return value at `fp - 1` (overwrites function object slot)
     - Pops `CallFrame`, restores `ip` and `fp`
 
 **Implementation note:** Arguments and locals remain in place on the stack - no copying occurs. Variable access uses
@@ -202,8 +201,8 @@ enum ValueImpl {
 
 ```
 [... caller frame ...]
-[func]                  <- fp points here at call time
-[arg0]
+[func]
+[arg0]                  <- fp points here at call time
 [arg1]
 ...
 [argN]

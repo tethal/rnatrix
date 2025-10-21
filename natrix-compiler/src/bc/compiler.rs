@@ -2,7 +2,7 @@ use crate::bc::builder::{BytecodeBuilder, InsKind, Label};
 use crate::ctx::CompilerContext;
 use crate::error::SourceResult;
 use crate::hir::{
-    Expr, ExprKind, Function, GlobalKind, LocalId, LocalKind, LoopId, Program, Stmt, StmtKind,
+    Expr, ExprKind, Function, GlobalKind, LocalKind, LoopId, Program, Stmt, StmtKind,
 };
 use natrix_runtime::bc::Bytecode;
 use natrix_runtime::value::{BinaryOp, CodeHandle, FunctionObject, UnaryOp, Value};
@@ -133,17 +133,15 @@ impl<'ctx> Compiler<'ctx> {
                 self.bb.append(stmt.span, InsKind::StoreGlobal(id.0))
             }
             StmtKind::StoreLocal(id, expr) => {
-                let slot = self.local_slot(*id);
                 self.do_expr(&expr)?;
-                self.bb.append(stmt.span, InsKind::StoreLocal(slot))
+                self.bb.append(stmt.span, InsKind::StoreLocal(id.0))
             }
             StmtKind::VarDecl(id, expr) => {
-                self.local_slots[id.0] = self.used_slots;
                 self.used_slots += 1;
                 self.max_slots = max(self.max_slots, self.used_slots);
+                self.local_slots[id.0] = self.used_slots;
                 self.do_expr(&expr)?;
-                self.bb
-                    .append(stmt.span, InsKind::StoreLocal(self.local_slot(*id)))
+                self.bb.append(stmt.span, InsKind::StoreLocal(id.0))
             }
             StmtKind::While(loop_id, cond, body) => {
                 let l_head = self.bb.new_label();
@@ -191,11 +189,10 @@ impl<'ctx> Compiler<'ctx> {
                 .append(expr.span, InsKind::LoadBuiltin(builtin.index())),
             ExprKind::LoadGlobal(id) => self.bb.append(expr.span, InsKind::LoadGlobal(id.0)),
             ExprKind::LoadLocal(id) => {
-                let slot = self.local_slot(*id);
-                if slot == 1 {
-                    self.bb.append(expr.span, InsKind::Load1)
+                if id.0 == 0 {
+                    self.bb.append(expr.span, InsKind::Load0)
                 } else {
-                    self.bb.append(expr.span, InsKind::LoadLocal(slot))
+                    self.bb.append(expr.span, InsKind::LoadLocal(id.0))
                 }
             }
             ExprKind::LogicalBinary(_, op_span, _, _) => {
@@ -265,10 +262,5 @@ impl<'ctx> Compiler<'ctx> {
                 Ok(())
             }
         }
-    }
-
-    fn local_slot(&self, id: LocalId) -> usize {
-        // Add one because slot 0 is reserved for the callee function object
-        self.local_slots[id.0] + 1
     }
 }

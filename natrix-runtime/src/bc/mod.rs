@@ -68,7 +68,7 @@ define_opcodes! {
     Ge => "ge";                     // 11
     Neg => "neg";                   // 12
     Not => "not";                   // 13
-    Load1 => "load_1";              // 14
+    Load0 => "load_0";              // 14
     LoadLocal => "load_local";      // 15 // N
     StoreLocal => "store_local";    // 16 // N
     LoadGlobal => "load_global";    // 17 // N

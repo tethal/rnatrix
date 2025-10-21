@@ -30,7 +30,7 @@ impl<'rt> Interpreter<'rt> {
         let mut ip = main.code_handle.0;
         let mut stack = Vec::new();
         let arg_cnt = args.len();
-        let fp = 0;
+        let fp = 1;
         stack.push(Value::NULL); // TODO push main function object
         stack.append(&mut args);
         assert_eq!(arg_cnt, main.param_count);
@@ -124,7 +124,7 @@ impl<'rt> Interpreter<'rt> {
                 Opcode::Ge => binary!(ge),
                 Opcode::Neg => unary!(negate),
                 Opcode::Not => unary!(not),
-                Opcode::Load1 => push!(stack[fp + 1].clone()),
+                Opcode::Load0 => push!(stack[fp].clone()),
                 Opcode::LoadLocal => push!(stack[fp + fetch_uleb!()].clone()),
                 Opcode::StoreLocal => stack[fp + fetch_uleb!()] = pop!(),
                 Opcode::LoadGlobal => push!(globals[fetch_uleb!()].clone()),
