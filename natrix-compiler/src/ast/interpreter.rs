@@ -2,9 +2,9 @@ use crate::ast::{AssignTargetKind, Expr, ExprKind, FunDecl, Program, Stmt, StmtK
 use crate::ctx::{CompilerContext, Name};
 use crate::error::{err_at, AttachErrSpan, SourceResult};
 use crate::src::Span;
-use natrix_runtime::nx_err::{nx_err, nx_error, NxResult};
-use natrix_runtime::runtime::{Builtin, Runtime};
-use natrix_runtime::value::{CodeHandle, FunctionObject, Value, ValueType};
+use natrix_runtime::ctx::RuntimeContext;
+use natrix_runtime::error::{nx_err, nx_error, NxResult};
+use natrix_runtime::value::{Builtin, Function, Value, ValueType};
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -30,7 +30,7 @@ impl Env {
         for builtin in Builtin::ALL {
             vars.insert(
                 ctx.interner.lookup(builtin.name()).unwrap(),
-                Value::from_function(Rc::new(builtin.as_function_object())),
+                Value::from_function(Rc::new(Function::Builtin(*builtin))),
             );
         }
         let env = Rc::new(Env {
@@ -94,15 +94,15 @@ impl Env {
     }
 }
 
-pub struct Interpreter<'ctx> {
-    ctx: &'ctx CompilerContext,
-    rt: &'ctx mut Runtime,
+pub struct Interpreter<'a> {
+    ctx: &'a CompilerContext,
+    rt: &'a mut RuntimeContext,
     globals: Rc<Env>,
     fun_decls: Vec<Rc<FunDecl>>,
 }
 
-impl<'ctx> Interpreter<'ctx> {
-    pub fn new(ctx: &'ctx CompilerContext, rt: &'ctx mut Runtime) -> Self {
+impl<'a> Interpreter<'a> {
+    pub fn new(ctx: &'a CompilerContext, rt: &'a mut RuntimeContext) -> Self {
         let globals = Env::new_root(ctx);
         Self {
             ctx,
@@ -117,11 +117,11 @@ impl<'ctx> Interpreter<'ctx> {
         let mut main_fun: Option<(Value, Span)> = None;
         for decl in program.decls {
             let index = self.fun_decls.len();
-            let fun_obj = Value::from_function(Rc::new(FunctionObject {
+            let fun_obj = Value::from_function(Rc::new(Function::UserDefined {
                 name: self.ctx.interner.resolve(decl.name).into(),
                 param_count: decl.params.len(),
                 max_slots: 0,
-                code_handle: CodeHandle(index),
+                code_handle: index,
             }));
             if main_name == Some(decl.name) {
                 main_fun = Some((fun_obj.clone(), decl.name_span));
@@ -142,26 +142,12 @@ impl<'ctx> Interpreter<'ctx> {
             return err_at(span, format!("not a function: {}", callee));
         }
         let fun_obj = callee.unwrap_function();
-
-        if args.len() != fun_obj.param_count {
-            return err_at(
-                span,
-                format!(
-                    "function {} expects {} argument{}, but {} were provided",
-                    fun_obj.name,
-                    fun_obj.param_count,
-                    if fun_obj.param_count == 1 { "" } else { "s" },
-                    args.len()
-                ),
-            );
-        }
-
-        match Builtin::from_code_handle(fun_obj.code_handle) {
-            Some(builtin) => self.rt.dispatch_builtin(builtin, &args).err_at(span),
-            None => self.invoke(
-                self.fun_decls.get(fun_obj.code_handle.0).unwrap().clone(),
-                args,
-            ),
+        fun_obj.check_args(args.len()).err_at(span)?;
+        match fun_obj.as_ref() {
+            Function::Builtin(builtin) => builtin.eval(self.rt, &args).err_at(span),
+            Function::UserDefined { code_handle, .. } => {
+                self.invoke(self.fun_decls.get(*code_handle).unwrap().clone(), args)
+            }
         }
     }
 

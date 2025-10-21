@@ -1,23 +1,23 @@
 use crate::bc::{Bytecode, Opcode};
+use crate::ctx::RuntimeContext;
+use crate::error::{nx_err, NxResult};
 use crate::leb128::{decode_sleb128, decode_uleb128};
-use crate::nx_err::{nx_err, NxResult};
-use crate::runtime::{Builtin, Runtime};
-use crate::value::{Value, ValueType};
+use crate::value::{Builtin, Function, Value, ValueType};
 use std::rc::Rc;
 
 pub struct Interpreter<'rt> {
-    rt: &'rt mut Runtime,
+    rt: &'rt mut RuntimeContext,
 }
 
 impl<'rt> Interpreter<'rt> {
-    pub fn new(rt: &'rt mut Runtime) -> Self {
+    pub fn new(rt: &'rt mut RuntimeContext) -> Self {
         Self { rt }
     }
 
     fn prepare_builtins() -> Vec<Value> {
         Builtin::ALL
             .iter()
-            .map(|b| Value::from_function(Rc::new(b.as_function_object())))
+            .map(|b| Value::from_function(Rc::new(Function::Builtin(*b))))
             .collect()
     }
 
@@ -25,16 +25,20 @@ impl<'rt> Interpreter<'rt> {
         let builtins = Self::prepare_builtins();
         let mut globals = bc.globals.clone();
         let main = &globals[0].unwrap_function();
-
+        let max_slots = if let Function::UserDefined { max_slots, .. } = main.as_ref() {
+            max_slots
+        } else {
+            todo!()
+        };
         let code = &bc.code;
-        let mut ip = main.code_handle.0;
+        let mut ip = 0; // TODO code_handle from Function
         let mut stack = Vec::new();
         let arg_cnt = args.len();
         let fp = 1;
         stack.push(Value::NULL); // TODO push main function object
         stack.append(&mut args);
-        assert_eq!(arg_cnt, main.param_count);
-        stack.resize(stack.len() + main.max_slots - arg_cnt, Value::NULL);
+        assert_eq!(arg_cnt, main.param_count());
+        stack.resize(stack.len() + *max_slots - arg_cnt, Value::NULL);
         // TODO do what "call arg_cnt" does - check args count, push frame, setup FP
 
         macro_rules! fetch_u8 {

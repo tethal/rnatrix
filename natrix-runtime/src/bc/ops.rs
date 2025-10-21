@@ -1,198 +1,113 @@
-use crate::nx_err::{nx_err, nx_error, NxResult};
+use crate::ctx::RuntimeContext;
+use crate::error::{nx_err, nx_error, NxResult};
+use crate::value::{BinaryOp, Builtin, Function, UnaryOp, Value, ValueType};
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
+use std::str::FromStr;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum BinaryOp {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    Eq,
-    Ne,
-    Lt,
-    Le,
-    Gt,
-    Ge,
+impl BinaryOp {
+    pub fn eval(&self, left: &Value, right: &Value) -> NxResult<Value> {
+        match self {
+            BinaryOp::Add => left.add(&right),
+            BinaryOp::Sub => left.sub(&right),
+            BinaryOp::Mul => left.mul(&right),
+            BinaryOp::Div => left.div(&right),
+            BinaryOp::Mod => left.rem(&right),
+            BinaryOp::Eq => left.eq(&right),
+            BinaryOp::Ne => left.ne(&right),
+            BinaryOp::Ge => left.ge(&right),
+            BinaryOp::Gt => left.gt(&right),
+            BinaryOp::Le => left.le(&right),
+            BinaryOp::Lt => left.lt(&right),
+        }
+    }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum UnaryOp {
-    Neg,
-    Not,
+impl UnaryOp {
+    pub fn eval(&self, arg: &Value) -> NxResult<Value> {
+        match self {
+            UnaryOp::Neg => arg.negate(),
+            UnaryOp::Not => arg.not(),
+        }
+    }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ValueType {
-    Null,
-    Bool,
-    Int,
-    Float,
-    String,
-    List,
-    Function,
-}
+impl Builtin {
+    pub fn eval(&self, rt: &mut RuntimeContext, args: &[Value]) -> NxResult<Value> {
+        debug_assert!(args.len() == 1);
+        match self {
+            Builtin::Float => Builtin::float(&args[0]),
+            Builtin::Int => Builtin::int(&args[0]),
+            Builtin::Len => Builtin::len(&args[0]),
+            Builtin::Print => Builtin::print(rt, &args[0]),
+            Builtin::Str => Builtin::str(&args[0]),
+        }
+    }
 
-#[derive(Debug, Clone)]
-pub struct Value(ValueImpl);
+    fn float(arg: &Value) -> NxResult<Value> {
+        match arg.get_type() {
+            ValueType::Int => Ok(Value::from_float(arg.unwrap_int() as f64)),
+            ValueType::Float => Ok(arg.clone()),
+            ValueType::String => Ok(Value::from_float(
+                f64::from_str(&arg.unwrap_string()).map_err(|e| nx_error(e.to_string()))?,
+            )),
+            t => nx_err(format!("float cannot be applied to {:?}", t)),
+        }
+    }
 
-#[derive(Debug, Clone)]
-enum ValueImpl {
-    Null,
-    Bool(bool),
-    Int(i64),
-    Float(f64),
-    String(Rc<str>),
-    List(Rc<RefCell<Vec<Value>>>),
-    Function(Rc<FunctionObject>),
-}
+    fn int(arg: &Value) -> NxResult<Value> {
+        match arg.get_type() {
+            ValueType::Int => Ok(arg.clone()),
+            // Truncates towards zero, saturates on overflow, NaN → 0
+            ValueType::Float => Ok(Value::from_int(arg.unwrap_float() as i64)),
+            ValueType::String => Ok(Value::from_int(
+                i64::from_str(&arg.unwrap_string()).map_err(|e| nx_error(e.to_string()))?,
+            )),
+            t => nx_err(format!("int cannot be applied to {:?}", t)),
+        }
+    }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CodeHandle(pub usize);
+    fn len(arg: &Value) -> NxResult<Value> {
+        match arg.get_type() {
+            ValueType::String => Ok(Value::from_int(arg.unwrap_string().len() as i64)),
+            ValueType::List => Ok(Value::from_int(arg.unwrap_list().borrow().len() as i64)),
+            t => nx_err(format!("len cannot be applied to {:?}", t)),
+        }
+    }
 
-#[derive(Debug)]
-pub struct FunctionObject {
-    pub name: Box<str>,
-    pub param_count: usize,
-    pub max_slots: usize, // includes parameters
-    pub code_handle: CodeHandle,
+    fn print(rt: &mut RuntimeContext, value: &Value) -> NxResult<Value> {
+        rt.write(format!("{}", value).as_str());
+        Ok(Value::NULL)
+    }
+
+    fn str(arg: &Value) -> NxResult<Value> {
+        Ok(Value::from_string(format!("{}", arg).into()))
+    }
 }
 
 impl Value {
-    pub const NULL: Value = Value(ValueImpl::Null);
-    pub const TRUE: Value = Value(ValueImpl::Bool(true));
-    pub const FALSE: Value = Value(ValueImpl::Bool(false));
-
-    pub fn from_bool(v: bool) -> Self {
-        Value(ValueImpl::Bool(v))
-    }
-
-    pub fn from_int(v: i64) -> Self {
-        Value(ValueImpl::Int(v))
-    }
-
-    pub fn from_float(v: f64) -> Self {
-        Value(ValueImpl::Float(v))
-    }
-
-    pub fn from_string(v: Rc<str>) -> Self {
-        Value(ValueImpl::String(v))
-    }
-
-    pub fn from_list(v: Rc<RefCell<Vec<Value>>>) -> Self {
-        Value(ValueImpl::List(v))
-    }
-
-    pub fn from_function(v: Rc<FunctionObject>) -> Self {
-        Value(ValueImpl::Function(v))
-    }
-
-    pub fn get_type(&self) -> ValueType {
-        match self.0 {
-            ValueImpl::Null => ValueType::Null,
-            ValueImpl::Bool(_) => ValueType::Bool,
-            ValueImpl::Int(_) => ValueType::Int,
-            ValueImpl::Float(_) => ValueType::Float,
-            ValueImpl::String(_) => ValueType::String,
-            ValueImpl::List(_) => ValueType::List,
-            ValueImpl::Function(_) => ValueType::Function,
-        }
-    }
-
-    pub fn is_null(&self) -> bool {
-        matches!(self.0, ValueImpl::Null)
-    }
-
-    pub fn is_bool(&self) -> bool {
-        matches!(self.0, ValueImpl::Bool(_))
-    }
-
-    pub fn is_int(&self) -> bool {
-        matches!(self.0, ValueImpl::Int(_))
-    }
-
-    pub fn is_float(&self) -> bool {
-        matches!(self.0, ValueImpl::Float(_))
-    }
-
-    pub fn is_string(&self) -> bool {
-        matches!(self.0, ValueImpl::String(_))
-    }
-
-    pub fn is_list(&self) -> bool {
-        matches!(self.0, ValueImpl::List(_))
-    }
-
-    pub fn is_function(&self) -> bool {
-        matches!(self.0, ValueImpl::Function(_))
-    }
-
-    pub fn is_numeric(&self) -> bool {
+    fn is_numeric(&self) -> bool {
         matches!(self.get_type(), ValueType::Int | ValueType::Float)
     }
 
-    pub fn unwrap_bool(&self) -> bool {
-        match self.0 {
-            ValueImpl::Bool(v) => v,
-            _ => panic!("expected bool, got {:?}", self.get_type()),
-        }
-    }
-
-    pub fn unwrap_int(&self) -> i64 {
-        match self.0 {
-            ValueImpl::Int(v) => v,
-            _ => panic!("expected int, got {:?}", self.get_type()),
-        }
-    }
-
-    pub fn unwrap_float(&self) -> f64 {
-        match self.0 {
-            ValueImpl::Float(v) => v,
-            _ => panic!("expected float, got {:?}", self.get_type()),
-        }
-    }
-
-    pub fn unwrap_string(&self) -> Rc<str> {
-        match &self.0 {
-            ValueImpl::String(v) => v.clone(),
-            _ => panic!("expected string, got {:?}", self.get_type()),
-        }
-    }
-
-    pub fn unwrap_list(&self) -> Rc<RefCell<Vec<Value>>> {
-        match &self.0 {
-            ValueImpl::List(v) => v.clone(),
-            _ => panic!("expected list, got {:?}", self.get_type()),
-        }
-    }
-
-    pub fn unwrap_function(&self) -> Rc<FunctionObject> {
-        match &self.0 {
-            ValueImpl::Function(v) => v.clone(),
-            _ => panic!("expected function, got {:?}", self.get_type()),
-        }
-    }
-
-    // Internal helpers - return reference to Rc (no refcount bump)
     fn string_ref(&self) -> &Rc<str> {
         match &self.0 {
-            ValueImpl::String(s) => s,
+            crate::value::ValueImpl::String(s) => s,
             _ => panic!("expected string, got {:?}", self.get_type()),
         }
     }
 
     fn list_ref(&self) -> &Rc<RefCell<Vec<Value>>> {
         match &self.0 {
-            ValueImpl::List(v) => v,
+            crate::value::ValueImpl::List(v) => v,
             _ => panic!("expected list, got {:?}", self.get_type()),
         }
     }
 
-    fn function_ref(&self) -> &Rc<FunctionObject> {
+    fn function_ref(&self) -> &Rc<Function> {
         match &self.0 {
-            ValueImpl::Function(v) => v,
+            crate::value::ValueImpl::Function(v) => v,
             _ => panic!("expected function, got {:?}", self.get_type()),
         }
     }
@@ -201,8 +116,8 @@ impl Value {
 
     fn to_f64(&self) -> f64 {
         match self.0 {
-            ValueImpl::Int(v) => v as f64,
-            ValueImpl::Float(v) => v,
+            crate::value::ValueImpl::Int(v) => v as f64,
+            crate::value::ValueImpl::Float(v) => v,
             _ => unreachable!("to_f64 called on non-numeric type"),
         }
     }
@@ -543,54 +458,34 @@ impl Value {
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.0 {
-            ValueImpl::Null => write!(f, "null"),
-            ValueImpl::Bool(v) => write!(f, "{}", v),
-            ValueImpl::Int(v) => write!(f, "{}", v),
-            ValueImpl::Float(v) => write!(f, "{:?}", v),
-            ValueImpl::String(v) => write!(f, "{}", v),
-            ValueImpl::List(v) => {
+            crate::value::ValueImpl::Null => write!(f, "null"),
+            crate::value::ValueImpl::Bool(v) => write!(f, "{}", v),
+            crate::value::ValueImpl::Int(v) => write!(f, "{}", v),
+            crate::value::ValueImpl::Float(v) => write!(f, "{:?}", v),
+            crate::value::ValueImpl::String(v) => write!(f, "{}", v),
+            crate::value::ValueImpl::List(v) => {
                 write!(f, "[")?;
                 for (i, e) in v.borrow().iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
                     match &e.0 {
-                        ValueImpl::String(s) => write!(f, "{:?}", s)?,
+                        crate::value::ValueImpl::String(s) => write!(f, "{:?}", s)?,
                         _ => write!(f, "{}", e)?,
                     }
                 }
                 write!(f, "]")
             }
-            ValueImpl::Function(fun) => {
-                write!(f, "<function {} at {:#x}>", fun.name, fun.code_handle.0)
-            }
-        }
-    }
-}
-
-impl BinaryOp {
-    pub fn eval(&self, left: &Value, right: &Value) -> NxResult<Value> {
-        match self {
-            BinaryOp::Add => left.add(&right),
-            BinaryOp::Sub => left.sub(&right),
-            BinaryOp::Mul => left.mul(&right),
-            BinaryOp::Div => left.div(&right),
-            BinaryOp::Mod => left.rem(&right),
-            BinaryOp::Eq => left.eq(&right),
-            BinaryOp::Ne => left.ne(&right),
-            BinaryOp::Ge => left.ge(&right),
-            BinaryOp::Gt => left.gt(&right),
-            BinaryOp::Le => left.le(&right),
-            BinaryOp::Lt => left.lt(&right),
-        }
-    }
-}
-
-impl UnaryOp {
-    pub fn eval(&self, arg: &Value) -> NxResult<Value> {
-        match self {
-            UnaryOp::Neg => arg.negate(),
-            UnaryOp::Not => arg.not(),
+            crate::value::ValueImpl::Function(fun) => match fun.as_ref() {
+                Function::Builtin(builtin) => {
+                    write!(f, "<built-in function {}>", builtin.name())
+                }
+                Function::UserDefined {
+                    name, code_handle, ..
+                } => {
+                    write!(f, "<function {} at {:#x}>", name, code_handle)
+                }
+            },
         }
     }
 }

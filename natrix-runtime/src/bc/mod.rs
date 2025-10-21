@@ -2,6 +2,7 @@ use crate::value::Value;
 pub use interpreter::Interpreter;
 
 mod interpreter;
+mod ops;
 
 #[derive(Debug)]
 pub struct Bytecode {

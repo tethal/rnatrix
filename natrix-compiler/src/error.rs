@@ -1,5 +1,5 @@
 use crate::src::{Sources, Span};
-use natrix_runtime::nx_err::{NxError, NxResult};
+use natrix_runtime::error::{NxError, NxResult};
 use std::fmt::{Debug, Display};
 
 pub type SourceResult<T> = Result<T, SourceError>;

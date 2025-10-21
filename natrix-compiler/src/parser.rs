@@ -19,13 +19,13 @@ pub fn parse(ctx: &mut CompilerContext, source_id: SourceId) -> ParseResult<Prog
     Ok(Program::new(fun_decls, parser.span()))
 }
 
-struct Parser<'ctx> {
-    tokenizer: Tokenizer<'ctx>,
+struct Parser<'a> {
+    tokenizer: Tokenizer<'a>,
     current_token: Token,
 }
 
-impl<'ctx> Parser<'ctx> {
-    fn new(ctx: &'ctx mut CompilerContext, source_id: SourceId) -> SourceResult<Self> {
+impl<'a> Parser<'a> {
+    fn new(ctx: &'a mut CompilerContext, source_id: SourceId) -> SourceResult<Self> {
         let mut tokenizer = Tokenizer::new(ctx, source_id);
         let current_token = tokenizer.next_token()?;
         Ok(Parser {

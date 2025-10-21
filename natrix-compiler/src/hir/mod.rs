@@ -3,8 +3,7 @@ mod debug;
 use crate::ctx::Name;
 use crate::src::Span;
 use crate::util::tree::def_node;
-use natrix_runtime::runtime::Builtin;
-use natrix_runtime::value::{BinaryOp, UnaryOp};
+use natrix_runtime::value::{BinaryOp, Builtin, UnaryOp};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct GlobalId(pub usize);
@@ -28,10 +27,10 @@ def_node!(GlobalInfo {
 });
 
 pub enum GlobalKind {
-    Function(Function),
+    Function(FunDecl),
 }
 
-def_node!(Function {
+def_node!(FunDecl {
     param_count: usize,
     locals: Vec<LocalInfo>, // invariant - first param_count elements are LocalKind::Parameter
     body: Vec<Stmt>,

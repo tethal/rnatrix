@@ -13,14 +13,14 @@ pub fn analyze(ctx: &CompilerContext, ast: &ast::Program) -> SourceResult<hir::P
     analyzer.do_program(ast)
 }
 
-struct Analyzer<'ctx> {
-    ctx: &'ctx CompilerContext,
+struct Analyzer<'a> {
+    ctx: &'a CompilerContext,
     global_scope: Rc<GlobalScope>,
     next_loop_id: usize,
 }
 
-impl<'ctx> Analyzer<'ctx> {
-    fn new(ctx: &'ctx CompilerContext) -> Self {
+impl<'a> Analyzer<'a> {
+    fn new(ctx: &'a CompilerContext) -> Self {
         Self {
             ctx,
             global_scope: GlobalScope::new(ctx),
@@ -45,7 +45,7 @@ impl<'ctx> Analyzer<'ctx> {
         Ok(hir::Program::new(globals, ast.span))
     }
 
-    fn do_fun_decl(&mut self, ast: &ast::FunDecl) -> SourceResult<hir::Function> {
+    fn do_fun_decl(&mut self, ast: &ast::FunDecl) -> SourceResult<hir::FunDecl> {
         let function_scope = FunctionScope::new(self.global_scope.clone());
         for (i, param) in ast.params.iter().enumerate() {
             function_scope.declare(
@@ -66,7 +66,7 @@ impl<'ctx> Analyzer<'ctx> {
                 span,
             ));
         }
-        Ok(hir::Function::new(
+        Ok(hir::FunDecl::new(
             ast.params.len(),
             function_scope.take_locals(),
             body,

@@ -10,13 +10,13 @@ pub struct Token {
     pub name: Option<Name>,
 }
 
-pub struct Tokenizer<'ctx> {
-    cursor: Cursor<'ctx>,
-    interner: &'ctx mut Interner,
+pub struct Tokenizer<'a> {
+    cursor: Cursor<'a>,
+    interner: &'a mut Interner,
 }
 
-impl<'ctx> Tokenizer<'ctx> {
-    pub fn new(ctx: &'ctx mut CompilerContext, source_id: SourceId) -> Tokenizer<'ctx> {
+impl<'a> Tokenizer<'a> {
+    pub fn new(ctx: &'a mut CompilerContext, source_id: SourceId) -> Tokenizer<'a> {
         Tokenizer {
             cursor: Cursor::new(ctx.sources.get_by_id(source_id)),
             interner: &mut ctx.interner,

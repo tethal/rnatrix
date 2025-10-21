@@ -196,14 +196,14 @@ impl<'a> Debug for SpanDebug<'a> {
     }
 }
 
-pub struct Cursor<'ctx> {
-    source: &'ctx Source,
+pub struct Cursor<'a> {
+    source: &'a Source,
     offset: usize,
     mark: usize,
 }
 
-impl<'ctx> Cursor<'ctx> {
-    pub fn new(source: &'ctx Source) -> Self {
+impl<'a> Cursor<'a> {
+    pub fn new(source: &'a Source) -> Self {
         Cursor {
             source,
             offset: 0,
@@ -232,7 +232,7 @@ impl<'ctx> Cursor<'ctx> {
         self.span_from(self.mark)
     }
 
-    pub fn lexeme(&self, span: Span) -> &'ctx str {
+    pub fn lexeme(&self, span: Span) -> &'a str {
         &self.source.content()[span.start..span.end]
     }
 

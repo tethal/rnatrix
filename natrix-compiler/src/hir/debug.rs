@@ -1,6 +1,6 @@
 use crate::ctx::{CompilerContext, Name};
 use crate::hir::{
-    Expr, ExprKind, Function, GlobalInfo, GlobalKind, LocalInfo, LocalKind, Program, Stmt, StmtKind,
+    Expr, ExprKind, FunDecl, GlobalInfo, GlobalKind, LocalInfo, LocalKind, Program, Stmt, StmtKind,
 };
 use crate::src::Span;
 use crate::util::tree::{def_formatter, impl_node_debug};
@@ -35,9 +35,9 @@ impl<'a> Debug for GlobalInfoDebug<'a> {
     }
 }
 
-impl_node_debug!(Function as function => FunctionDebug HirFormatter);
+impl_node_debug!(FunDecl as function => FunDeclDebug HirFormatter);
 
-impl<'a> Debug for FunctionDebug<'a> {
+impl<'a> Debug for FunDeclDebug<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}Function:\n", self.fmt.indent_str())?;
         for l in self.function.locals.iter() {

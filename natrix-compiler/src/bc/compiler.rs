@@ -1,11 +1,9 @@
 use crate::bc::builder::{BytecodeBuilder, InsKind, Label};
 use crate::ctx::CompilerContext;
 use crate::error::SourceResult;
-use crate::hir::{
-    Expr, ExprKind, Function, GlobalKind, LocalKind, LoopId, Program, Stmt, StmtKind,
-};
+use crate::hir::{Expr, ExprKind, FunDecl, GlobalKind, LocalKind, LoopId, Program, Stmt, StmtKind};
 use natrix_runtime::bc::Bytecode;
-use natrix_runtime::value::{BinaryOp, CodeHandle, FunctionObject, UnaryOp, Value};
+use natrix_runtime::value::{BinaryOp, Function, UnaryOp, Value};
 use std::cmp::max;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -24,11 +22,11 @@ pub fn compile(ctx: &CompilerContext, program: &Program) -> SourceResult<Bytecod
     //
     //     }
     // }).collect();
-    let globals = vec![Value::from_function(Rc::new(FunctionObject {
+    let globals = vec![Value::from_function(Rc::new(Function::UserDefined {
         name: "main".into(),
         param_count: 1,
         max_slots: compiler.functions[0].max_slots,
-        code_handle: CodeHandle(0),
+        code_handle: 0,
     }))];
     Ok(Bytecode {
         code: bb.encode(),
@@ -41,8 +39,8 @@ struct FunctionInfo {
 }
 
 // TODO: split to two - extract FunctionCompiler
-struct Compiler<'ctx> {
-    ctx: &'ctx CompilerContext,
+struct Compiler<'a> {
+    ctx: &'a CompilerContext,
     used_slots: usize,
     max_slots: usize,
     local_slots: Vec<usize>, // indexed by LocalId
@@ -51,8 +49,8 @@ struct Compiler<'ctx> {
     bb: BytecodeBuilder,
 }
 
-impl<'ctx> Compiler<'ctx> {
-    fn new(ctx: &'ctx CompilerContext) -> Self {
+impl<'a> Compiler<'a> {
+    fn new(ctx: &'a CompilerContext) -> Self {
         Self {
             ctx,
             used_slots: 0,
@@ -64,7 +62,7 @@ impl<'ctx> Compiler<'ctx> {
         }
     }
 
-    fn do_function(&mut self, f: &Function) -> SourceResult<()> {
+    fn do_function(&mut self, f: &FunDecl) -> SourceResult<()> {
         self.local_slots.resize(f.locals.len(), 0);
         for i in 0..f.param_count {
             assert_eq!(f.locals[i].kind, LocalKind::Parameter(i));

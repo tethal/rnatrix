@@ -2,7 +2,7 @@ use natrix_compiler::ast::Interpreter;
 use natrix_compiler::ctx::CompilerContext;
 use natrix_compiler::parser::parse;
 use natrix_compiler::token::{TokenType, Tokenizer};
-use natrix_runtime::runtime::Runtime;
+use natrix_runtime::ctx::RuntimeContext;
 use std::fmt::Write;
 use std::path::Path;
 use test_utils::{datatest_stable, run_golden_test};
@@ -51,7 +51,7 @@ fn test_ast_interpreter(path: &Path) -> test_utils::TestResult {
                 return format!("{}", error.display_with(&ctx.sources));
             }
         };
-        let mut rt = Runtime::with_capture();
+        let mut rt = RuntimeContext::with_capture();
         let mut interpreter = Interpreter::new(&mut ctx, &mut rt);
         let result = interpreter.run(program, vec![]);
         let mut output = rt.take_output();

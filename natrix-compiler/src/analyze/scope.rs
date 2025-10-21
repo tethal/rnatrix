@@ -2,7 +2,7 @@ use crate::ctx::{CompilerContext, Name};
 use crate::error::{err_at, SourceResult};
 use crate::hir::{GlobalId, LocalId, LocalInfo, LocalKind};
 use crate::src::Span;
-use natrix_runtime::runtime::Builtin;
+use natrix_runtime::value::Builtin;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;

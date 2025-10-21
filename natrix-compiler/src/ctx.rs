@@ -1,6 +1,6 @@
 use crate::src::Sources;
 use crate::token_type::{TokenType, KEYWORDS};
-use natrix_runtime::runtime::Builtin;
+use natrix_runtime::value::Builtin;
 use std::collections::HashMap;
 use std::num::NonZeroU32;
 
