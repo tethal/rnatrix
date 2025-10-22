@@ -36,4 +36,5 @@ define_builtins! {
     Len => "len", 1;
     Print => "print", 1;
     Str => "str", 1;
+    Time => "time", 0;
 }

@@ -35,13 +35,14 @@ impl UnaryOp {
 
 impl Builtin {
     pub fn eval(&self, rt: &mut RuntimeContext, args: &[Value]) -> NxResult<Value> {
-        debug_assert!(args.len() == 1);
+        debug_assert!(args.len() == self.param_count());
         match self {
             Builtin::Float => Builtin::float(&args[0]),
             Builtin::Int => Builtin::int(&args[0]),
             Builtin::Len => Builtin::len(&args[0]),
             Builtin::Print => Builtin::print(rt, &args[0]),
             Builtin::Str => Builtin::str(&args[0]),
+            Builtin::Time => Builtin::time(),
         }
     }
 
@@ -83,6 +84,15 @@ impl Builtin {
 
     fn str(arg: &Value) -> NxResult<Value> {
         Ok(Value::from_string(format!("{}", arg).into()))
+    }
+
+    fn time() -> NxResult<Value> {
+        let now = std::time::SystemTime::now();
+        let duration = now
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("System time is before UNIX epoch");
+        let seconds = duration.as_secs() as f64 + duration.subsec_nanos() as f64 / 1_000_000_000.0;
+        Ok(Value::from_float(seconds))
     }
 }
 
