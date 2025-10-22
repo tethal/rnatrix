@@ -181,14 +181,16 @@ impl<'a> FunctionCompiler<'a> {
             }
             StmtKind::StoreLocal(id, expr) => {
                 self.do_expr(&expr);
-                self.bb.append(stmt.span, InsKind::StoreLocal(id.0))
+                self.bb
+                    .append(stmt.span, InsKind::StoreLocal(self.local_slots[id.0]))
             }
             StmtKind::VarDecl(id, expr) => {
+                let slot = self.used_slots;
+                self.local_slots[id.0] = slot;
                 self.used_slots += 1;
                 self.max_slots = max(self.max_slots, self.used_slots);
-                self.local_slots[id.0] = self.used_slots;
                 self.do_expr(&expr);
-                self.bb.append(stmt.span, InsKind::StoreLocal(id.0))
+                self.bb.append(stmt.span, InsKind::StoreLocal(slot))
             }
             StmtKind::While(loop_id, cond, body) => {
                 let l_head = self.bb.new_label();
@@ -254,7 +256,8 @@ impl<'a> FunctionCompiler<'a> {
                 if id.0 == 0 {
                     self.bb.append(expr.span, InsKind::Load0)
                 } else {
-                    self.bb.append(expr.span, InsKind::LoadLocal(id.0))
+                    self.bb
+                        .append(expr.span, InsKind::LoadLocal(self.local_slots[id.0]))
                 }
             }
             ExprKind::LogicalBinary(_, op_span, _, _) => {
