@@ -3,6 +3,7 @@ use crate::ctx::RuntimeContext;
 use crate::error::{nx_err, NxResult};
 use crate::leb128::{decode_sleb128, decode_uleb128};
 use crate::value::{Builtin, Function, Value, ValueType};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 struct CallFrame {
@@ -50,6 +51,7 @@ impl<'a> Interpreter<'a> {
 
     pub fn run(&mut self, bc: &Bytecode, args: Vec<Value>) -> NxResult<Value> {
         let builtins = Self::prepare_builtins();
+        let constants = &bc.constants;
         let mut globals = bc.globals.clone();
         let main = &globals[bc.main_index];
         let (mut stack, mut ip) = Self::prepare_stack(main.clone(), args)?;
@@ -129,7 +131,7 @@ impl<'a> Interpreter<'a> {
                 Opcode::PushFalse => push!(Value::FALSE),
                 Opcode::PushTrue => push!(Value::TRUE),
                 Opcode::PushInt => push!(Value::from_int(fetch_sleb!())),
-                // PushConst => "push_const";      // 06 // N
+                Opcode::PushConst => push!(constants[fetch_uleb!()].clone()),
                 Opcode::Add => binary!(add),
                 Opcode::Sub => binary!(sub),
                 Opcode::Mul => binary!(mul),
@@ -149,9 +151,23 @@ impl<'a> Interpreter<'a> {
                 Opcode::LoadGlobal => push!(globals[fetch_uleb!()].clone()),
                 Opcode::StoreGlobal => globals[fetch_uleb!()] = pop!(),
                 Opcode::LoadBuiltin => push!(builtins[fetch_uleb!()].clone()),
-                // MakeList => "make_list";        // 1A // N
-                // GetItem => "get_item";          // 1B
-                // SetItem => "set_item";          // 1C
+                Opcode::MakeList => {
+                    let n = fetch_uleb!();
+                    let v = stack[stack.len() - n..].to_vec();
+                    stack.truncate(stack.len() - n);
+                    push!(Value::from_list(Rc::new(RefCell::new(v))))
+                }
+                Opcode::GetItem => {
+                    let index = pop!();
+                    let array = pop!();
+                    push!(array.get_item(index)?)
+                }
+                Opcode::SetItem => {
+                    let value = pop!();
+                    let index = pop!();
+                    let array = pop!();
+                    array.set_item(index, value)?
+                }
                 Opcode::Jmp => ip = fetch_jump_target!(),
                 Opcode::JFalse => {
                     let target = fetch_jump_target!();
@@ -210,7 +226,6 @@ impl<'a> Interpreter<'a> {
                 Opcode::Pop => {
                     pop!();
                 }
-                op => todo!("opcode {:?}", op),
             }
         }
     }

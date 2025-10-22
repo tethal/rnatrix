@@ -7,8 +7,8 @@ mod ops;
 #[derive(Debug)]
 pub struct Bytecode {
     pub code: Vec<u8>,
-    // pub constants: Vec<Value>,
-    // line table
+    pub constants: Vec<Value>,
+    // TODO line table
     pub globals: Vec<Value>,
     pub main_index: usize,
 }

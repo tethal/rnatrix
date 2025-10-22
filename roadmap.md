@@ -100,9 +100,9 @@ See [[README]] for project overview and design decisions.
 
 **7. Remaining Features (deferred - can be implemented in any order)**
 
-- [ ] **Floats** - Constant pool storage, numeric coercion in operators
-- [ ] **Strings** - Constant pool storage, concatenation, comparison, indexing
-- [ ] **Lists** - Heap allocation, `make_list`/`get_item`/`set_item` instructions
+- [X] **Floats** - Constant pool storage, numeric coercion in operators
+- [X] **Strings** - Constant pool storage, concatenation, comparison, indexing
+- [X] **Lists** - Heap allocation, `make_list`/`get_item`/`set_item` instructions
 - [ ] **Debugging metadata** - Variable name tables, line number tables for stack traces
 - [ ] **Disassembler** - Bytecode → human-readable instruction listing with constant pool references
 

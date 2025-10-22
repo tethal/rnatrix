@@ -4,6 +4,7 @@ use crate::ctx::Name;
 use crate::src::Span;
 use crate::util::tree::def_node;
 use natrix_runtime::value::{BinaryOp, Builtin, UnaryOp};
+use std::rc::Rc;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct GlobalId(pub usize);
@@ -61,6 +62,7 @@ pub enum StmtKind {
     Expr(Expr),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     Return(Expr),
+    SetItem(Expr, Expr, Expr),
     StoreGlobal(GlobalId, Expr),
     StoreLocal(LocalId, Expr),
     VarDecl(LocalId, Expr),
@@ -76,11 +78,15 @@ pub enum ExprKind {
     Binary(BinaryOp, Span, Box<Expr>, Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),
     ConstBool(bool),
+    ConstFloat(f64),
     ConstInt(i64),
     ConstNull,
+    ConstString(Rc<str>),
+    GetItem(Box<Expr>, Box<Expr>),
     LoadBuiltin(Builtin),
     LoadGlobal(GlobalId),
     LoadLocal(LocalId),
     LogicalBinary(bool, Span, Box<Expr>, Box<Expr>),
+    MakeList(Vec<Expr>),
     Unary(UnaryOp, Span, Box<Expr>),
 }

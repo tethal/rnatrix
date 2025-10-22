@@ -95,7 +95,15 @@ impl<'a> Analyzer<'a> {
     ) -> SourceResult<hir::Stmt> {
         match &ast.kind {
             ast::StmtKind::Assign { target, value } => match &target.kind {
-                ast::AssignTargetKind::ArrayAccess { array: _, index: _ } => todo!("Array access"),
+                ast::AssignTargetKind::ArrayAccess { array, index } => {
+                    let array = self.do_expr(scope, array)?;
+                    let index = self.do_expr(scope, index)?;
+                    let value = self.do_expr(scope, value)?;
+                    Ok(hir::Stmt::new(
+                        hir::StmtKind::SetItem(array, index, value),
+                        ast.span,
+                    ))
+                }
                 ast::AssignTargetKind::Var(name) => {
                     let symbol = scope.lookup(self.ctx, name, target.span)?;
                     let value = self.do_expr(scope, value)?;
@@ -184,7 +192,14 @@ impl<'a> Analyzer<'a> {
 
     fn do_expr(&mut self, scope: &Rc<BlockScope>, ast: &ast::Expr) -> SourceResult<hir::Expr> {
         match &ast.kind {
-            // ArrayAccess
+            ast::ExprKind::ArrayAccess { array, index } => {
+                let array = self.do_expr(scope, array)?;
+                let index = self.do_expr(scope, index)?;
+                Ok(hir::Expr::new(
+                    hir::ExprKind::GetItem(Box::new(array), Box::new(index)),
+                    ast.span,
+                ))
+            }
             ast::ExprKind::Binary {
                 op,
                 op_span,
@@ -212,12 +227,19 @@ impl<'a> Analyzer<'a> {
                     ast.span,
                 ))
             }
-            // Call
-            // FloatLiteral
+            ast::ExprKind::FloatLiteral(v) => {
+                Ok(hir::Expr::new(hir::ExprKind::ConstFloat(*v), ast.span))
+            }
             ast::ExprKind::IntLiteral(v) => {
                 Ok(hir::Expr::new(hir::ExprKind::ConstInt(*v), ast.span))
             }
-            // ListLiteral
+            ast::ExprKind::ListLiteral(elements) => {
+                let elements = elements
+                    .iter()
+                    .map(|e| self.do_expr(scope, e))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(hir::Expr::new(hir::ExprKind::MakeList(elements), ast.span))
+            }
             ast::ExprKind::LogicalBinary {
                 and,
                 op_span,
@@ -233,7 +255,10 @@ impl<'a> Analyzer<'a> {
             }
             ast::ExprKind::NullLiteral => Ok(hir::Expr::new(hir::ExprKind::ConstNull, ast.span)),
             ast::ExprKind::Paren(expr) => self.do_expr(scope, expr),
-            // StringLiteral
+            ast::ExprKind::StringLiteral(v) => Ok(hir::Expr::new(
+                hir::ExprKind::ConstString(v.clone()),
+                ast.span,
+            )),
             ast::ExprKind::Unary { op, op_span, expr } => {
                 let expr = self.do_expr(scope, expr)?;
                 Ok(hir::Expr::new(
@@ -249,7 +274,6 @@ impl<'a> Analyzer<'a> {
                 },
                 ast.span,
             )),
-            _ => todo!("{:?}", ast),
         }
     }
 }

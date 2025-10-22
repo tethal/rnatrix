@@ -5,11 +5,13 @@ use crate::hir::{Expr, ExprKind, FunDecl, GlobalKind, LocalKind, LoopId, Program
 use natrix_runtime::bc::Bytecode;
 use natrix_runtime::value::{BinaryOp, Function, UnaryOp, Value};
 use std::cmp::max;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 pub fn compile(ctx: &CompilerContext, program: &Program) -> SourceResult<Bytecode> {
     let mut code = Vec::new();
+    let mut cp: ConstantPool = ConstantPool::new();
     let mut globals = Vec::new();
     let mut main_index: Option<usize> = None;
 
@@ -21,7 +23,7 @@ pub fn compile(ctx: &CompilerContext, program: &Program) -> SourceResult<Bytecod
                     main_index = Some(index);
                 }
                 let code_handle = code.len();
-                let (mut f_code, max_slots) = do_function(fun_decl);
+                let (mut f_code, max_slots) = do_function(&mut cp, fun_decl);
                 code.append(&mut f_code);
                 globals.push(Value::from_function(Rc::new(Function::UserDefined {
                     name: name.into(),
@@ -35,6 +37,7 @@ pub fn compile(ctx: &CompilerContext, program: &Program) -> SourceResult<Bytecod
     match main_index {
         Some(main_index) => Ok(Bytecode {
             code,
+            constants: cp.constants,
             globals,
             main_index,
         }),
@@ -42,7 +45,7 @@ pub fn compile(ctx: &CompilerContext, program: &Program) -> SourceResult<Bytecod
     }
 }
 
-fn do_function(fun_decl: &FunDecl) -> (Vec<u8>, usize) {
+fn do_function(cp: &mut ConstantPool, fun_decl: &FunDecl) -> (Vec<u8>, usize) {
     let mut local_slots = Vec::new();
     local_slots.resize(fun_decl.locals.len(), 0);
     for i in 0..fun_decl.param_count {
@@ -56,21 +59,68 @@ fn do_function(fun_decl: &FunDecl) -> (Vec<u8>, usize) {
         local_slots,
         loop_labels: HashMap::new(),
         bb: BytecodeBuilder::new(),
+        cp,
     };
     c.do_block(&fun_decl.body);
-    println!("Code:\n{:?}", c.bb);
     (c.bb.encode(), c.max_slots)
 }
 
-struct FunctionCompiler {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum ConstantKey {
+    Float(u64),
+    String(Rc<str>),
+}
+
+struct ConstantPool {
+    constants: Vec<Value>,
+    map: HashMap<ConstantKey, usize>,
+}
+
+impl ConstantPool {
+    fn new() -> Self {
+        Self {
+            constants: Vec::new(),
+            map: HashMap::new(),
+        }
+    }
+
+    fn add_float(&mut self, value: f64) -> usize {
+        let key = ConstantKey::Float(value.to_bits());
+        match self.map.entry(key) {
+            Entry::Vacant(e) => {
+                let index = self.constants.len();
+                e.insert(index);
+                self.constants.push(Value::from_float(value));
+                index
+            }
+            Entry::Occupied(e) => *e.get(),
+        }
+    }
+
+    fn add_string(&mut self, value: &Rc<str>) -> usize {
+        let key = ConstantKey::String(value.clone());
+        match self.map.entry(key) {
+            Entry::Vacant(e) => {
+                let index = self.constants.len();
+                e.insert(index);
+                self.constants.push(Value::from_string(value.clone()));
+                index
+            }
+            Entry::Occupied(e) => *e.get(),
+        }
+    }
+}
+
+struct FunctionCompiler<'a> {
     used_slots: usize,
     max_slots: usize,
     local_slots: Vec<usize>,                      // indexed by LocalId
     loop_labels: HashMap<LoopId, (Label, Label)>, // break target, continue target
     bb: BytecodeBuilder,
+    cp: &'a mut ConstantPool,
 }
 
-impl FunctionCompiler {
+impl<'a> FunctionCompiler<'a> {
     fn do_block(&mut self, stmts: &[Stmt]) {
         let saved_slots = self.used_slots;
         for stmt in stmts {
@@ -118,6 +168,12 @@ impl FunctionCompiler {
             StmtKind::Return(expr) => {
                 self.do_expr(&expr);
                 self.bb.append(stmt.span, InsKind::Ret)
+            }
+            StmtKind::SetItem(array, index, value) => {
+                self.do_expr(&array);
+                self.do_expr(&index);
+                self.do_expr(&value);
+                self.bb.append(stmt.span, InsKind::SetItem)
             }
             StmtKind::StoreGlobal(id, expr) => {
                 self.do_expr(&expr);
@@ -175,10 +231,21 @@ impl FunctionCompiler {
             }
             ExprKind::ConstBool(v) if *v => self.bb.append(expr.span, InsKind::PushTrue),
             ExprKind::ConstBool(_) => self.bb.append(expr.span, InsKind::PushFalse),
+            ExprKind::ConstFloat(v) => self
+                .bb
+                .append(expr.span, InsKind::PushConst(self.cp.add_float(*v))),
             ExprKind::ConstInt(v) if *v == 0 => self.bb.append(expr.span, InsKind::Push0),
             ExprKind::ConstInt(v) if *v == 1 => self.bb.append(expr.span, InsKind::Push1),
             ExprKind::ConstInt(v) => self.bb.append(expr.span, InsKind::PushInt(*v)),
             ExprKind::ConstNull => self.bb.append(expr.span, InsKind::PushNull),
+            ExprKind::ConstString(v) => self
+                .bb
+                .append(expr.span, InsKind::PushConst(self.cp.add_string(v))),
+            ExprKind::GetItem(array, index) => {
+                self.do_expr(&array);
+                self.do_expr(&index);
+                self.bb.append(expr.span, InsKind::GetItem)
+            }
             ExprKind::LoadBuiltin(builtin) => self
                 .bb
                 .append(expr.span, InsKind::LoadBuiltin(builtin.index())),
@@ -201,6 +268,10 @@ impl FunctionCompiler {
                 self.bb.define_label(*op_span, l_false);
                 self.bb.append(*op_span, InsKind::PushFalse);
                 self.bb.define_label(*op_span, l_end);
+            }
+            ExprKind::MakeList(elements) => {
+                elements.iter().for_each(|e| self.do_expr(&e));
+                self.bb.append(expr.span, InsKind::MakeList(elements.len()))
             }
             ExprKind::Unary(op, op_span, expr) => {
                 self.do_expr(&expr);

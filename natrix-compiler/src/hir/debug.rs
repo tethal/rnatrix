@@ -98,6 +98,12 @@ impl<'a> Debug for StmtDebug<'a> {
                 self.fmt.header(f, "Return", span)?;
                 self.fmt.expr(f, expr)
             }
+            StmtKind::SetItem(array, index, value) => {
+                self.fmt.header(f, "SetItem", span)?;
+                self.fmt.expr(f, array)?;
+                self.fmt.expr(f, index)?;
+                self.fmt.expr(f, value)
+            }
             StmtKind::StoreGlobal(id, value) => {
                 self.fmt.header_with_value(f, "StoreGlobal", span, id)?;
                 self.fmt.expr(f, value)
@@ -139,8 +145,17 @@ impl<'a> Debug for ExprDebug<'a> {
                 Ok(())
             }
             ExprKind::ConstBool(value) => self.fmt.header_with_value(f, "ConstBool", span, value),
+            ExprKind::ConstFloat(value) => self.fmt.header_with_value(f, "ConstFloat", span, value),
             ExprKind::ConstInt(value) => self.fmt.header_with_value(f, "ConstInt", span, value),
             ExprKind::ConstNull => self.fmt.header(f, "ConstNull", span),
+            ExprKind::ConstString(value) => {
+                self.fmt.header_with_value(f, "ConstString", span, value)
+            }
+            ExprKind::GetItem(array, index) => {
+                self.fmt.header(f, "GetItem", span)?;
+                self.fmt.expr(f, array)?;
+                self.fmt.expr(f, index)
+            }
             ExprKind::LoadBuiltin(builtin) => {
                 self.fmt.header_with_value(f, "LoadBuiltin", span, builtin)
             }
@@ -151,6 +166,13 @@ impl<'a> Debug for ExprDebug<'a> {
                 self.fmt.property_with_span(f, "and", and, *op_span)?;
                 self.fmt.expr(f, left)?;
                 self.fmt.expr(f, right)
+            }
+            ExprKind::MakeList(vec) => {
+                self.fmt.header(f, "MakeList", span)?;
+                for e in vec {
+                    self.fmt.expr(f, e)?;
+                }
+                Ok(())
             }
             ExprKind::Unary(op, op_span, expr) => {
                 self.fmt.header_with_value(f, "Unary", *op_span, *op)?;
