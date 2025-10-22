@@ -52,6 +52,7 @@ pub enum InsKind {
     Sub,
 }
 
+#[allow(dead_code)]
 pub struct Ins {
     pub kind: InsKind,
     pub span: Span,
