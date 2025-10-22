@@ -1,0 +1,85 @@
+// Higher-order functions without closures
+
+// Simple arithmetic operations
+fun add(a, b) {
+    return a + b;
+}
+
+fun sub(a, b) {
+    return a - b;
+}
+
+fun mul(a, b) {
+    return a * b;
+}
+
+// Apply a binary operation
+fun apply_op(op, x, y) {
+    return op(x, y);
+}
+
+// Choose operation based on string
+fun get_operation(name) {
+    if (name == "add") {
+        return add;
+    }
+    if (name == "sub") {
+        return sub;
+    }
+    if (name == "mul") {
+        return mul;
+    }
+    return null;
+}
+
+// Apply operation twice (simple composition)
+fun apply_twice(op, x, y, z) {
+    var temp = op(x, y);
+    return op(temp, z);
+}
+
+// Conditional execution - call fn1 or fn2 based on condition
+fun conditional_call(condition, fn1, fn2, arg) {
+    if (condition) {
+        return fn1(arg, arg);
+    } else {
+        return fn2(arg, arg);
+    }
+}
+
+fun square(x, ignored) {
+    return x * x;
+}
+
+fun double(x, ignored) {
+    return x + x;
+}
+
+fun main() {
+    // Basic higher-order function
+    print(apply_op(add, 5, 3));
+    print(apply_op(sub, 10, 4));
+    print(apply_op(mul, 7, 6));
+
+    // Function dispatch by name
+    var op = get_operation("add");
+    print(op(20, 30));
+
+    op = get_operation("mul");
+    print(op(4, 5));
+
+    // Composition (manual chaining)
+    print(apply_twice(add, 1, 2, 3));  // (1+2)+3 = 6
+    print(apply_twice(mul, 2, 3, 4));  // (2*3)*4 = 24
+
+    // Conditional function call
+    print(conditional_call(true, square, double, 5));   // square(5,5) = 25
+    print(conditional_call(false, square, double, 5));  // double(5,5) = 10
+
+    // Store function in variable
+    var my_func = add;
+    print(my_func(100, 200));
+
+    my_func = mul;
+    print(my_func(11, 11));
+}

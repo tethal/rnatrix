@@ -1,0 +1,38 @@
+fun sieve(limit) {
+    // Create list of candidates [2, 3, 4, ..., limit]
+    var numbers = [];
+    var i = 2;
+    while (i <= limit) {
+        numbers = numbers + [i];
+        i = i + 1;
+    }
+
+    var primes = [];
+    var idx = 0;
+
+    while (idx < len(numbers)) {
+        var prime = numbers[idx];
+        if (prime != 0) {
+            primes = primes + [prime];
+
+            // Mark multiples as 0
+            var j = idx + prime;
+            while (j < len(numbers)) {
+                numbers[j] = 0;
+                j = j + prime;
+            }
+        }
+        idx = idx + 1;
+    }
+
+    return primes;
+}
+
+fun main() {
+    var primes = sieve(30);
+    var i = 0;
+    while (i < len(primes)) {
+        print(primes[i]);
+        i = i + 1;
+    }
+}

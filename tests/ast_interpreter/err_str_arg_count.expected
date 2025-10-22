@@ -1,0 +1,3 @@
+<string>:2:11: error: function str expects 1 argument, but 0 were provided
+    print(str());
+          ^^^^^

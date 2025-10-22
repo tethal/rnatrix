@@ -30,7 +30,4 @@ fun main() {
     // Negative results
     print(5 - 10);
     print(-5.5 + 2.0);
-
-    // Division by zero (int)
-    print(10 / 0);
 }

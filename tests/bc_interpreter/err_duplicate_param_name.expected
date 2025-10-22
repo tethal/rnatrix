@@ -1,0 +1,3 @@
+<string>:1:10: error: symbol a already defined in this scope
+fun f(a, a) {
+         ^

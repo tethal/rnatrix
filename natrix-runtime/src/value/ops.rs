@@ -1,6 +1,6 @@
 use crate::ctx::RuntimeContext;
 use crate::error::{nx_err, nx_error, NxResult};
-use crate::value::{BinaryOp, Builtin, Function, UnaryOp, Value, ValueType};
+use crate::value::{BinaryOp, Builtin, Function, UnaryOp, Value, ValueImpl, ValueType};
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
@@ -93,21 +93,21 @@ impl Value {
 
     fn string_ref(&self) -> &Rc<str> {
         match &self.0 {
-            crate::value::ValueImpl::String(s) => s,
+            ValueImpl::String(s) => s,
             _ => panic!("expected string, got {:?}", self.get_type()),
         }
     }
 
     fn list_ref(&self) -> &Rc<RefCell<Vec<Value>>> {
         match &self.0 {
-            crate::value::ValueImpl::List(v) => v,
+            ValueImpl::List(v) => v,
             _ => panic!("expected list, got {:?}", self.get_type()),
         }
     }
 
     fn function_ref(&self) -> &Rc<Function> {
         match &self.0 {
-            crate::value::ValueImpl::Function(v) => v,
+            ValueImpl::Function(v) => v,
             _ => panic!("expected function, got {:?}", self.get_type()),
         }
     }
@@ -116,8 +116,8 @@ impl Value {
 
     fn to_f64(&self) -> f64 {
         match self.0 {
-            crate::value::ValueImpl::Int(v) => v as f64,
-            crate::value::ValueImpl::Float(v) => v,
+            ValueImpl::Int(v) => v as f64,
+            ValueImpl::Float(v) => v,
             _ => unreachable!("to_f64 called on non-numeric type"),
         }
     }
@@ -458,25 +458,25 @@ impl Value {
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.0 {
-            crate::value::ValueImpl::Null => write!(f, "null"),
-            crate::value::ValueImpl::Bool(v) => write!(f, "{}", v),
-            crate::value::ValueImpl::Int(v) => write!(f, "{}", v),
-            crate::value::ValueImpl::Float(v) => write!(f, "{:?}", v),
-            crate::value::ValueImpl::String(v) => write!(f, "{}", v),
-            crate::value::ValueImpl::List(v) => {
+            ValueImpl::Null => write!(f, "null"),
+            ValueImpl::Bool(v) => write!(f, "{}", v),
+            ValueImpl::Int(v) => write!(f, "{}", v),
+            ValueImpl::Float(v) => write!(f, "{:?}", v),
+            ValueImpl::String(v) => write!(f, "{}", v),
+            ValueImpl::List(v) => {
                 write!(f, "[")?;
                 for (i, e) in v.borrow().iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
                     match &e.0 {
-                        crate::value::ValueImpl::String(s) => write!(f, "{:?}", s)?,
+                        ValueImpl::String(s) => write!(f, "{:?}", s)?,
                         _ => write!(f, "{}", e)?,
                     }
                 }
                 write!(f, "]")
             }
-            crate::value::ValueImpl::Function(fun) => match fun.as_ref() {
+            ValueImpl::Function(fun) => match fun.as_ref() {
                 Function::Builtin(builtin) => {
                     write!(f, "<built-in function {}>", builtin.name())
                 }

@@ -193,7 +193,9 @@ impl<'a> Interpreter<'a> {
                     fun_obj.check_args(arg_count)?;
                     match fun_obj.as_ref() {
                         Function::Builtin(builtin) => {
-                            builtin.eval(self.rt, &stack[new_fp..new_fp + arg_count])?;
+                            let r = builtin.eval(self.rt, &stack[new_fp..new_fp + arg_count])?;
+                            stack[new_fp - 1] = r;
+                            stack.truncate(new_fp);
                         }
                         Function::UserDefined {
                             max_slots,
@@ -212,7 +214,7 @@ impl<'a> Interpreter<'a> {
                 }
                 Opcode::Ret => {
                     stack[fp - 1] = stack.last().unwrap().clone();
-                    stack.resize(fp, Value::NULL);
+                    stack.truncate(fp);
                     match self.frames.pop() {
                         Some(frame) => {
                             ip = frame.ret_addr;

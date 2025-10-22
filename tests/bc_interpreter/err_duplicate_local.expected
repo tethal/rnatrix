@@ -1,0 +1,3 @@
+<string>:3:9: error: symbol x already defined in this scope
+    var x = 20;
+        ^

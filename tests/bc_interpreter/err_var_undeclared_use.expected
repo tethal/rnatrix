@@ -1,0 +1,3 @@
+<string>:3:9: error: undeclared variable "y"
+    x + y;
+        ^

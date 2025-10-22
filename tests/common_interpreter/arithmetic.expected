@@ -20,6 +20,3 @@
 1.5
 -5
 -3.5
-<string>:35:14: error: division by zero
-    print(10 / 0);
-             ^

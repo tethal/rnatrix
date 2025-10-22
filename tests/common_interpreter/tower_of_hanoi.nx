@@ -1,0 +1,23 @@
+// Solve Tower of Hanoi puzzle
+// Prints sequence of moves to solve n-disk puzzle
+
+fun hanoi(n, from, to, aux) {
+    if (n == 1) {
+        print("Move disk 1 from " + from + " to " + to);
+        return;
+    }
+
+    // Move n-1 disks from 'from' to 'aux', using 'to' as auxiliary
+    hanoi(n - 1, from, aux, to);
+
+    // Move the nth disk from 'from' to 'to'
+    print("Move disk " + str(n) + " from " + from + " to " + to);
+
+    // Move n-1 disks from 'aux' to 'to', using 'from' as auxiliary
+    hanoi(n - 1, aux, to, from);
+}
+
+fun main() {
+    print("Solving 3-disk Tower of Hanoi:");
+    hanoi(3, "A", "C", "B");
+}

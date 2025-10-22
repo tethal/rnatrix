@@ -182,7 +182,7 @@ impl BytecodeBuilder {
                 label_offsets[label.0] = code.len();
             } else {
                 let (opcode, immediates) = ins.encoding();
-                code.push(opcode as u8);
+                code.push(opcode.as_u8());
                 match immediates {
                     Immediates::None => {}
                     Immediates::Usize(i) => encode_uleb128(i, |b| code.push(b)),

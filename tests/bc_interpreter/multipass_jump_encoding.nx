@@ -1,0 +1,15 @@
+fun main() {
+    // Jump forward over many instructions
+    if (false) {
+        // Add enough operations to make jump offset large
+        var a = 1 + 2 + 3 + 4 + 5;
+        var b = 6 + 7 + 8 + 9 + 10;
+        var c = 11 + 12 + 13 + 14 + 15;
+        var d = 16 + 17 + 18 + 19 + 20;
+        var e = 21 + 22 + 23 + 24 + 25;
+        var f = 26 + 27 + 28 + 29 + 30;
+        var g = 31 + 32 + 33 + 34 + 35;
+        var h = 36 + 37 + 38 + 39 + 40;
+    }
+    print("42");
+}

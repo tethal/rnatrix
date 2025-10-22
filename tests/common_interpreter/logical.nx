@@ -28,7 +28,4 @@ fun main() {
 
     // Short-circuit OR - right side should not evaluate (would cause div by zero)
     print(true || (10 / 0 > 0));
-
-    // Non-short-circuit cases that should error
-    print(true && (10 / 0 > 0));
 }

@@ -4,5 +4,4 @@ fun main() {
     print(str(42));
     print(str(4.2));
     print(str("abc"));
-    print(str());
 }
