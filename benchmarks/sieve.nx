@@ -1,0 +1,43 @@
+// Sieve of Eratosthenes - find all primes up to n
+// Heavy on: list operations, local variables, nested loops
+
+fun sieve(n) {
+    // Create list of candidates (2..n)
+    var is_prime = [true] * (n + 1);
+
+    is_prime[0] = false;  // 0 is not prime
+    is_prime[1] = false;  // 1 is not prime
+
+    var p = 2;
+    while (p * p <= n) {
+        if (is_prime[p]) {
+            // Mark all multiples of p as composite
+            var multiple = p * p;
+            while (multiple <= n) {
+                is_prime[multiple] = false;
+                multiple = multiple + p;
+            }
+        }
+        p = p + 1;
+    }
+
+    // Count primes
+    var count = 0;
+    var i = 2;
+    while (i <= n) {
+        if (is_prime[i]) {
+            count = count + 1;
+        }
+        i = i + 1;
+    }
+
+    return count;
+}
+
+fun run() {
+    return sieve(100000);
+}
+
+fun main(args) {
+    benchmark(args, run, 10);
+}

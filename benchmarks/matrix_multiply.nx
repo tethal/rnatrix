@@ -1,0 +1,54 @@
+// Matrix multiplication benchmark
+// Heavy on: nested loops, list access, many local variables
+
+fun make_matrix(rows, cols, value) {
+    var matrix = [];
+    var i = 0;
+    while (i < rows) {
+        var row = [];
+        var j = 0;
+        while (j < cols) {
+            row = row + [value];
+            j = j + 1;
+        }
+        matrix = matrix + [row];
+        i = i + 1;
+    }
+    return matrix;
+}
+
+fun matrix_multiply(a, b, size) {
+    var result = make_matrix(size, size, 0);
+
+    var i = 0;
+    while (i < size) {
+        var j = 0;
+        while (j < size) {
+            var sum = 0;
+            var k = 0;
+            while (k < size) {
+                var a_val = a[i][k];
+                var b_val = b[k][j];
+                sum = sum + a_val * b_val;
+                k = k + 1;
+            }
+            result[i][j] = sum;
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+
+    return result;
+}
+
+fun run() {
+    var size = 30;
+    var a = make_matrix(size, size, 2);
+    var b = make_matrix(size, size, 3);
+    var result = matrix_multiply(a, b, size);
+    return result[0][0];  // Just return one element to verify
+}
+
+fun main(args) {
+    benchmark(args, run, 5);  // Fewer iterations since this is slower
+}

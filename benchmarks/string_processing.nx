@@ -1,0 +1,40 @@
+// String processing benchmark
+// Heavy on: string operations, local variables, character manipulation
+
+fun count_chars(text, target) {
+    var count = 0;
+    var i = 0;
+    var text_len = len(text);
+    while (i < text_len) {
+        if (text[i] == target) {
+            count = count + 1;
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
+fun build_and_search() {
+    // Build a moderately long string
+    var text = "";
+    var i = 0;
+    while (i < 1000) {
+        text = text + "the quick brown fox jumps over the lazy dog ";
+        i = i + 1;
+    }
+
+    // Search for different characters
+    var e_count = count_chars(text, 101);  // 'e' in ASCII
+    var o_count = count_chars(text, 111);  // 'o' in ASCII
+    var a_count = count_chars(text, 97);   // 'a' in ASCII
+
+    return e_count + o_count + a_count;
+}
+
+fun run() {
+    return build_and_search();
+}
+
+fun main(args) {
+    benchmark(args, run, 10);
+}

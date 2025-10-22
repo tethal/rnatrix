@@ -87,7 +87,7 @@ See [[README]] for project overview and design decisions.
 - [X] Compiler: Jump label tracking
 - [X] Compiler: Conditional jumps (jtrue/jfalse), unconditional jumps (jmp)
 - [X] VM: Jump instructions (update instruction pointer)
-- [ ] Test: Loops, conditionals, local variable manipulation, De Morgan
+- [X] Test: Loops, conditionals, local variable manipulation, De Morgan
 
 **6. Functions and Calls**
 
@@ -96,13 +96,14 @@ See [[README]] for project overview and design decisions.
 - [X] Compiler: Call instruction emission, argument handling
 - [X] VM: Frame metadata stack (`Vec<CallFrame>`)
 - [X] VM: Frame management (push/pop CallFrame on call/ret, frame pointer tracking)
-- [ ] Test: Recursive functions (e.g., fibonacci), multiple function calls
+- [X] Test: Recursive functions (e.g., fibonacci), multiple function calls
 
 **7. Remaining Features (deferred - can be implemented in any order)**
 
 - [X] **Floats** - Constant pool storage, numeric coercion in operators
 - [X] **Strings** - Constant pool storage, concatenation, comparison, indexing
 - [X] **Lists** - Heap allocation, `make_list`/`get_item`/`set_item` instructions
+- [X] **Benchmarks** - Simple benchmark harness for comparing with AST interpreter
 - [ ] **Debugging metadata** - Variable name tables, line number tables for stack traces
 - [ ] **Disassembler** - Bytecode → human-readable instruction listing with constant pool references
 
@@ -122,7 +123,6 @@ See [[README]] for project overview and design decisions.
 **Flat bytecode layout:**
 
 - VM always operates on flat `Vec<u8>` from day one
-- Entry point is byte offset, not function object lookup
 - Functions are just labeled offsets in the bytecode
 - Execution starts at offset 0 by convention for single-file scripts
 

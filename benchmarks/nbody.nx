@@ -1,0 +1,81 @@
+// N-body simulation (simplified)
+// Heavy on: floating-point math, many local variables, list access
+
+fun simulate_step(bodies, dt) {
+    var n = len(bodies);
+
+    // Update velocities based on gravitational forces
+    var i = 0;
+    while (i < n) {
+        var body_i = bodies[i];
+        var xi = body_i[0];
+        var yi = body_i[1];
+        var vxi = body_i[2];
+        var vyi = body_i[3];
+        var mi = body_i[4];
+
+        var j = 0;
+        while (j < n) {
+            if (i != j) {
+                var body_j = bodies[j];
+                var xj = body_j[0];
+                var yj = body_j[1];
+                var mj = body_j[4];
+
+                var dx = xj - xi;
+                var dy = yj - yi;
+                var dist_sq = dx * dx + dy * dy;
+                var dist = dist_sq;  // Would use sqrt, but we don't have it
+
+                // Simplified force calculation (not physically accurate)
+                var force = mj / (dist_sq + 1.0);
+                vxi = vxi + force * dx * dt;
+                vyi = vyi + force * dy * dt;
+            }
+            j = j + 1;
+        }
+
+        body_i[2] = vxi;
+        body_i[3] = vyi;
+        i = i + 1;
+    }
+
+    // Update positions based on velocities
+    i = 0;
+    while (i < n) {
+        var body = bodies[i];
+        body[0] = body[0] + body[2] * dt;
+        body[1] = body[1] + body[3] * dt;
+        i = i + 1;
+    }
+}
+
+fun run() {
+    // Create 10 bodies: [x, y, vx, vy, mass]
+    var bodies = [
+        [0.0, 0.0, 0.0, 0.0, 10.0],
+        [1.0, 0.0, 0.0, 1.0, 1.0],
+        [0.0, 1.0, -1.0, 0.0, 1.0],
+        [-1.0, 0.0, 0.0, -1.0, 1.0],
+        [0.0, -1.0, 1.0, 0.0, 1.0],
+        [2.0, 2.0, -0.5, -0.5, 2.0],
+        [-2.0, 2.0, -0.5, 0.5, 2.0],
+        [-2.0, -2.0, 0.5, 0.5, 2.0],
+        [2.0, -2.0, 0.5, -0.5, 2.0],
+        [1.5, 1.5, -0.7, -0.7, 1.5]
+    ];
+
+    var steps = 100;
+    var dt = 0.01;
+    var i = 0;
+    while (i < steps) {
+        simulate_step(bodies, dt);
+        i = i + 1;
+    }
+
+    return bodies[0][0];  // Return x position of first body
+}
+
+fun main(args) {
+    benchmark(args, run, 10);
+}

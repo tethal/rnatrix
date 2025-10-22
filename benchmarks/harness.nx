@@ -1,0 +1,24 @@
+fun benchmark(args, f, iterations) {
+    var min = float("1e300");
+    var max = 0;
+    var sum = 0;
+    var i = 0;
+    while (i < iterations) {
+        i = i + 1;
+        var start = time();
+        f();
+        var delta = time() - start;
+        print("Iteration " + str(i) + ": " + str(delta));
+        if (min > delta) {
+            min = delta;
+        }
+        if (max < delta) {
+            max = delta;
+        }
+        sum = sum + delta;
+    }
+    print("---SUMMARY---");
+    print("BEST: " + str(min));
+    print("AVG: " + str(sum / iterations));
+    print("WORST: " + str(max));
+}
