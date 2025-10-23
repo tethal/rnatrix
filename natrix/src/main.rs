@@ -3,6 +3,7 @@ use natrix_compiler::ast::Interpreter as AstInterpreter;
 use natrix_compiler::bc::compiler::compile;
 use natrix_compiler::ctx::CompilerContext;
 use natrix_compiler::error::{AttachErrSpan, SourceResult};
+use natrix_compiler::hir::opt::fold_constants;
 use natrix_compiler::parser::parse;
 use natrix_runtime::bc::Interpreter as BcInterpreter;
 use natrix_runtime::ctx::RuntimeContext;
@@ -130,7 +131,8 @@ fn run(ctx: &mut CompilerContext, config: Config) -> SourceResult<()> {
             interpreter.run(ast, vec![args])?
         }
         Mode::Bytecode => {
-            let hir = analyze(&ctx, &ast)?;
+            let mut hir = analyze(&ctx, &ast)?;
+            fold_constants(&mut hir)?;
             if config.dump_hir {
                 println!("{:?}", hir.debug_with(&ctx));
             }

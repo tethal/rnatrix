@@ -2,7 +2,7 @@ use crate::bc::{Bytecode, Opcode};
 use crate::ctx::RuntimeContext;
 use crate::error::{nx_err, NxResult};
 use crate::leb128::{decode_sleb128, decode_uleb128};
-use crate::value::{Builtin, Function, Value, ValueType};
+use crate::value::{Builtin, Function, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -100,7 +100,7 @@ impl<'a> Interpreter<'a> {
         macro_rules! pop_bool {
             () => {{
                 let value = pop!();
-                if value.get_type() != ValueType::Bool {
+                if !value.is_bool() {
                     nx_err("expected a boolean value")
                 } else {
                     Ok(value.unwrap_bool())

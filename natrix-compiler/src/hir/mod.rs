@@ -1,4 +1,5 @@
 mod debug;
+pub mod opt;
 
 use crate::ctx::Name;
 use crate::src::Span;

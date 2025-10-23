@@ -61,9 +61,9 @@ See [[README]] for project overview and design decisions.
 
 **2. Sample optimization Pass**
 
-- [ ] Simple constant folding on HIR
-- [ ] Also fold builtin calls (e.g., `int("42")`)
-- [ ] Test: Constant expressions fold correctly at HIR level
+- [X] Simple constant folding on HIR
+- [X] Also fold builtin calls (e.g., `int("42")`)
+- [X] Test: Constant expressions fold correctly at HIR level
 
 **3. Bytecode Infrastructure**
 

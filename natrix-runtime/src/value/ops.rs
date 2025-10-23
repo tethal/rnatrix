@@ -46,6 +46,18 @@ impl Builtin {
         }
     }
 
+    pub fn eval_const(&self, args: &[Value]) -> NxResult<Option<Value>> {
+        debug_assert!(args.len() == self.param_count());
+        match self {
+            Builtin::Float => Ok(Some(Builtin::float(&args[0])?)),
+            Builtin::Int => Ok(Some(Builtin::int(&args[0])?)),
+            Builtin::Len => Ok(Some(Builtin::len(&args[0])?)),
+            Builtin::Print => Ok(None),
+            Builtin::Str => Ok(Some(Builtin::str(&args[0])?)),
+            Builtin::Time => Ok(None),
+        }
+    }
+
     fn float(arg: &Value) -> NxResult<Value> {
         match arg.get_type() {
             ValueType::Int => Ok(Value::from_float(arg.unwrap_int() as f64)),
