@@ -6,7 +6,11 @@ fun hanoi(n, src_peg, dst_peg, tmp_peg) {
     return moves + 1;
 }
 
-fun main(n) {
+fun main(args) {
+    var n = 14;
+    if (len(args) > 0) {
+        n = int(args[0]);
+    }
     print("Solution for Tower of Hanoi with " + str(n) + " discs:");
     var moves = hanoi(n, "A", "B", "C");
     print("Total " + str(moves) + " moves");

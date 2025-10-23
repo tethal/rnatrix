@@ -30,9 +30,12 @@ fun sieve(limit) {
     return primes;
 }
 
-fun main(n) {
+fun main(args) {
+    var n = 14;
+    if (len(args) > 0) {
+        n = int(args[0]);
+    }
     var primes = sieve(n);
     print("Primes up to " + str(n) + ":");
     print(primes);
-    return 0;
 }

@@ -28,9 +28,12 @@ fun print_triangle(triangle) {
     }
 }
 
-fun main(n) {
+fun main(args) {
+    var n = 14;
+    if (len(args) > 0) {
+        n = int(args[0]);
+    }
     var triangle = pascal(n);
     print("Pascal's Triangle (" + str(n) + " rows):");
     print_triangle(triangle);
-    return 0;
 }

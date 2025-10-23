@@ -12,5 +12,4 @@ fun histogram(data) {
 fun main(_) {
     var scores = [5, 12, 8, 15, 3, 10, 7];
     histogram(scores);
-    return 0;
 }
